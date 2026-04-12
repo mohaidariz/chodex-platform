@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { type SupabaseClient } from '@supabase/supabase-js'
 import { createServiceClient } from '@/lib/supabase/server'
 import { generateEmbedding } from '@/lib/openai/embeddings'
 import { streamChatCompletion, extractLearnings } from '@/lib/openai/chat'
@@ -152,8 +153,7 @@ export async function POST(req: NextRequest) {
 }
 
 async function extractLearningsAsync(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any,
+  supabase: SupabaseClient,
   orgId: string,
   conversationId: string
 ) {
@@ -184,8 +184,7 @@ async function extractLearningsAsync(
 }
 
 async function triggerEmailSummary(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any,
+  supabase: SupabaseClient,
   org: { id: string; name: string; email_from: string | null; email_reply_to: string | null },
   conversationId: string,
   visitorEmail: string,

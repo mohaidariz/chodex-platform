@@ -78,7 +78,7 @@ export function MessageList({ messages, orgName }: MessageListProps) {
           <Bot className="w-8 h-8 text-blue-600" />
         </div>
         <h3 className="font-semibold text-slate-800 text-lg">
-          Hi! I'm {orgName ? `${orgName}'s` : 'your'} AI Assistant
+          Hi! I&apos;m {orgName ? `${orgName}'s` : 'your'} AI Assistant
         </h3>
         <p className="text-slate-500 text-sm mt-2 max-w-xs">
           Ask me anything about our products, services, or documentation.
