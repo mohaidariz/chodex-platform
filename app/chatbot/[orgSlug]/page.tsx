@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2, X, Minimize2 } from 'lucide-react';
+import { Send, Bot, User, Loader2, X } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -80,7 +80,6 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
       setMessages((prev) => [...prev, assistantMessage]);
       setState((prev) => ({ ...prev, conversationId: data.conversationId }));
 
-      // Check if agent is asking for contact info
       const lowerResponse = data.response.toLowerCase();
       if (
         !state.visitorName &&
@@ -136,23 +135,18 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-950 text-white">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-4 bg-gray-900 border-b border-gray-800 shrink-0">
-        <div className="w-9 h-9 bg-indigo-600 rounded-full flex items-center justify-center">
+    <div className="flex flex-col h-screen bg-[#F8FAFB] text-[#0F172A]">
+      {/* Header — navy */}
+      <div className="flex items-center gap-3 px-4 py-4 bg-[#0F172A] border-b border-[#1E293B] shrink-0">
+        <div className="w-9 h-9 bg-white/10 rounded-full flex items-center justify-center">
           <Bot className="w-5 h-5 text-white" />
         </div>
         <div>
           <p className="text-sm font-semibold text-white">AI Assistant</p>
           <div className="flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            <p className="text-xs text-gray-400">Online</p>
+            <div className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
+            <p className="text-xs text-[#94A3B8]">Online</p>
           </div>
-        </div>
-        <div className="ml-auto flex items-center gap-1">
-          <button className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-gray-800 transition-colors">
-            <Minimize2 className="w-4 h-4" />
-          </button>
         </div>
       </div>
 
@@ -164,22 +158,22 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
             className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             {msg.role === 'assistant' && (
-              <div className="w-7 h-7 bg-indigo-600 rounded-full flex items-center justify-center shrink-0 mb-0.5">
+              <div className="w-7 h-7 bg-[#0F172A] rounded-full flex items-center justify-center shrink-0 mb-0.5">
                 <Bot className="w-3.5 h-3.5 text-white" />
               </div>
             )}
             <div
               className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                 msg.role === 'user'
-                  ? 'bg-indigo-600 text-white rounded-br-sm'
-                  : 'bg-gray-800 text-gray-100 rounded-bl-sm'
+                  ? 'bg-[#0F172A] text-white rounded-br-sm'
+                  : 'bg-white text-[#0F172A] rounded-bl-sm border border-[#E2E8F0]'
               }`}
             >
               {msg.content}
             </div>
             {msg.role === 'user' && (
-              <div className="w-7 h-7 bg-gray-700 rounded-full flex items-center justify-center shrink-0 mb-0.5">
-                <User className="w-3.5 h-3.5 text-gray-300" />
+              <div className="w-7 h-7 bg-[#CBD5E1] rounded-full flex items-center justify-center shrink-0 mb-0.5">
+                <User className="w-3.5 h-3.5 text-[#475569]" />
               </div>
             )}
           </div>
@@ -187,14 +181,14 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
 
         {loading && (
           <div className="flex items-end gap-2">
-            <div className="w-7 h-7 bg-indigo-600 rounded-full flex items-center justify-center shrink-0">
+            <div className="w-7 h-7 bg-[#0F172A] rounded-full flex items-center justify-center shrink-0">
               <Bot className="w-3.5 h-3.5 text-white" />
             </div>
-            <div className="bg-gray-800 rounded-2xl rounded-bl-sm px-4 py-3">
+            <div className="bg-white border border-[#E2E8F0] rounded-2xl rounded-bl-sm px-4 py-3">
               <div className="flex gap-1">
-                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <div className="w-2 h-2 bg-[#94A3B8] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 bg-[#94A3B8] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-2 h-2 bg-[#94A3B8] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
           </div>
@@ -207,16 +201,16 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
         <div className="px-4 pb-3">
           <form
             onSubmit={handleInfoSubmit}
-            className="bg-gray-800 border border-gray-700 rounded-2xl p-4 space-y-3"
+            className="bg-white border border-[#E2E8F0] rounded-2xl p-4 space-y-3"
           >
-            <p className="text-sm text-gray-300 font-medium">Share your contact info</p>
+            <p className="text-sm text-[#0F172A] font-medium">Share your contact info</p>
             <input
               type="text"
               required
               placeholder="Your name"
               value={nameInput}
               onChange={(e) => setNameInput(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full bg-[#F8FAFB] border border-[#E2E8F0] rounded-xl px-3 py-2.5 text-sm text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#0F172A]"
             />
             <input
               type="email"
@@ -224,19 +218,19 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
               placeholder="Your email"
               value={emailInput}
               onChange={(e) => setEmailInput(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full bg-[#F8FAFB] border border-[#E2E8F0] rounded-xl px-3 py-2.5 text-sm text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#0F172A]"
             />
             <div className="flex gap-2">
               <button
                 type="submit"
-                className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium py-2 rounded-xl transition-colors"
+                className="flex-1 bg-[#0F172A] hover:bg-[#1E293B] text-white text-sm font-medium py-2 rounded-xl transition-colors"
               >
                 Submit
               </button>
               <button
                 type="button"
                 onClick={() => setShowInfoForm(false)}
-                className="px-3 py-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-xl transition-colors"
+                className="px-3 py-2 text-[#94A3B8] hover:text-[#0F172A] hover:bg-[#F1F5F9] rounded-xl transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -246,8 +240,8 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
       )}
 
       {/* Input */}
-      <div className="px-4 pb-4 pt-2 shrink-0 bg-gray-950 border-t border-gray-800">
-        <div className="flex items-center gap-2 bg-gray-800 border border-gray-700 rounded-2xl px-4 py-2.5 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent transition">
+      <div className="px-4 pb-4 pt-2 shrink-0 bg-white border-t border-[#E2E8F0]">
+        <div className="flex items-center gap-2 bg-[#F8FAFB] border border-[#E2E8F0] rounded-2xl px-4 py-2.5 focus-within:ring-2 focus-within:ring-[#0F172A] focus-within:border-transparent transition">
           <input
             ref={inputRef}
             type="text"
@@ -256,21 +250,21 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             disabled={loading}
-            className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 focus:outline-none disabled:opacity-50"
+            className="flex-1 bg-transparent text-sm text-[#0F172A] placeholder-[#94A3B8] focus:outline-none disabled:opacity-50"
           />
           <button
             onClick={() => sendMessage(input)}
             disabled={!input.trim() || loading}
-            className="w-8 h-8 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl flex items-center justify-center transition-colors shrink-0"
+            className="w-8 h-8 bg-[#0F172A] hover:bg-[#1E293B] disabled:opacity-40 disabled:cursor-not-allowed rounded-xl flex items-center justify-center transition-colors shrink-0"
           >
             {loading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin text-white" />
             ) : (
-              <Send className="w-3.5 h-3.5" />
+              <Send className="w-3.5 h-3.5 text-white" />
             )}
           </button>
         </div>
-        <p className="text-center text-gray-600 text-xs mt-2">Powered by Chodex</p>
+        <p className="text-center text-[#94A3B8] text-xs mt-2">Powered by Chodex</p>
       </div>
     </div>
   );
