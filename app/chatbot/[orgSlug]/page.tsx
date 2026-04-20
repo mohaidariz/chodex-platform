@@ -135,137 +135,199 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
   }
 
   return (
-    <div className="flex flex-col h-screen bg-[#F8FAFB] text-[#0F172A]">
-      {/* Header — navy */}
-      <div className="flex items-center gap-3 px-4 py-4 bg-[#0F172A] border-b border-[#1E293B] shrink-0">
-        <div className="w-9 h-9 bg-white/10 rounded-full flex items-center justify-center">
-          <Bot className="w-5 h-5 text-white" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-white">AI Assistant</p>
-          <div className="flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
-            <p className="text-xs text-[#94A3B8]">Online</p>
-          </div>
-        </div>
-      </div>
+    <>
+      {/* Ensure no white flash on load and dark scrollbar in messages pane */}
+      <style>{`
+        html, body { background: #0A0A0A !important; }
+        .messages-scroll::-webkit-scrollbar { width: 4px; }
+        .messages-scroll::-webkit-scrollbar-track { background: transparent; }
+        .messages-scroll::-webkit-scrollbar-thumb { background-color: #2a2a2a; border-radius: 4px; }
+        .messages-scroll { scrollbar-width: thin; scrollbar-color: #2a2a2a transparent; }
+      `}</style>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-5 space-y-4">
-        {messages.map((msg) => (
+      <div className="flex flex-col h-screen bg-[#0A0A0A] text-[#E0E0E0]">
+
+        {/* Header */}
+        <div
+          className="flex items-center gap-3 px-4 py-4 bg-[#0A0A0A] shrink-0"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}
+        >
           <div
-            key={msg.id}
-            className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+            style={{
+              background: 'rgba(0,192,255,0.12)',
+              boxShadow: '0 0 12px rgba(0,192,255,0.15)',
+            }}
           >
-            {msg.role === 'assistant' && (
-              <div className="w-7 h-7 bg-[#0F172A] rounded-full flex items-center justify-center shrink-0 mb-0.5">
-                <Bot className="w-3.5 h-3.5 text-white" />
-              </div>
-            )}
-            <div
-              className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                msg.role === 'user'
-                  ? 'bg-[#0F172A] text-white rounded-br-sm'
-                  : 'bg-white text-[#0F172A] rounded-bl-sm border border-[#E2E8F0]'
-              }`}
-            >
-              {msg.content}
-            </div>
-            {msg.role === 'user' && (
-              <div className="w-7 h-7 bg-[#CBD5E1] rounded-full flex items-center justify-center shrink-0 mb-0.5">
-                <User className="w-3.5 h-3.5 text-[#475569]" />
-              </div>
-            )}
+            <Bot className="w-5 h-5 text-[#00C0FF]" />
           </div>
-        ))}
-
-        {loading && (
-          <div className="flex items-end gap-2">
-            <div className="w-7 h-7 bg-[#0F172A] rounded-full flex items-center justify-center shrink-0">
-              <Bot className="w-3.5 h-3.5 text-white" />
+          <div>
+            <p className="text-sm font-semibold text-[#E0E0E0]">AI Assistant</p>
+            <div className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-[#00C0FF] animate-pulse" />
+              <p className="text-xs text-[#A0A0A0]">Online</p>
             </div>
-            <div className="bg-white border border-[#E2E8F0] rounded-2xl rounded-bl-sm px-4 py-3">
-              <div className="flex gap-1">
-                <div className="w-2 h-2 bg-[#94A3B8] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-2 h-2 bg-[#94A3B8] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-2 h-2 bg-[#94A3B8] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div className="messages-scroll flex-1 overflow-y-auto px-4 py-5 space-y-4 bg-[#0A0A0A]">
+          {messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              {msg.role === 'assistant' && (
+                <div
+                  className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mb-0.5"
+                  style={{
+                    background: 'rgba(0,192,255,0.12)',
+                    boxShadow: '0 0 12px rgba(0,192,255,0.1)',
+                  }}
+                >
+                  <Bot className="w-3.5 h-3.5 text-[#00C0FF]" />
+                </div>
+              )}
+              <div
+                className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed text-[#E0E0E0] ${
+                  msg.role === 'user' ? 'rounded-br-sm' : 'rounded-bl-sm'
+                }`}
+                style={
+                  msg.role === 'user'
+                    ? {
+                        background: 'rgba(0,192,255,0.12)',
+                        border: '1px solid rgba(0,192,255,0.2)',
+                      }
+                    : {
+                        background: '#1A1A1A',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                      }
+                }
+              >
+                {msg.content}
+              </div>
+              {msg.role === 'user' && (
+                <div
+                  className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mb-0.5"
+                  style={{ background: 'rgba(255,255,255,0.08)' }}
+                >
+                  <User className="w-3.5 h-3.5 text-[#A0A0A0]" />
+                </div>
+              )}
+            </div>
+          ))}
+
+          {loading && (
+            <div className="flex items-end gap-2">
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                style={{
+                  background: 'rgba(0,192,255,0.12)',
+                  boxShadow: '0 0 12px rgba(0,192,255,0.1)',
+                }}
+              >
+                <Bot className="w-3.5 h-3.5 text-[#00C0FF]" />
+              </div>
+              <div
+                className="rounded-2xl rounded-bl-sm px-4 py-3"
+                style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.06)' }}
+              >
+                <div className="flex gap-1">
+                  <div className="w-2 h-2 bg-[#A0A0A0] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-2 h-2 bg-[#A0A0A0] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-2 h-2 bg-[#A0A0A0] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
               </div>
             </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Contact info form */}
+        {showInfoForm && (
+          <div className="px-4 pb-3">
+            <form
+              onSubmit={handleInfoSubmit}
+              className="rounded-2xl p-4 space-y-3"
+              style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              <p className="text-sm text-[#E0E0E0] font-medium">Share your contact info</p>
+              <input
+                type="text"
+                required
+                placeholder="Your name"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                className="w-full rounded-xl px-3 py-2.5 text-sm text-[#E0E0E0] placeholder-[#707070] focus:outline-none transition border border-white/10 focus:border-[#00C0FF] focus:ring-[3px] focus:ring-[#00C0FF]/15"
+                style={{ background: '#0A0A0A' }}
+              />
+              <input
+                type="email"
+                required
+                placeholder="Your email"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                className="w-full rounded-xl px-3 py-2.5 text-sm text-[#E0E0E0] placeholder-[#707070] focus:outline-none transition border border-white/10 focus:border-[#00C0FF] focus:ring-[3px] focus:ring-[#00C0FF]/15"
+                style={{ background: '#0A0A0A' }}
+              />
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  className="flex-1 bg-[#00C0FF] hover:bg-[#007BFF] text-[#0A0A0A] text-sm font-semibold py-2 rounded-xl transition-colors"
+                >
+                  Submit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowInfoForm(false)}
+                  className="px-3 py-2 text-[#A0A0A0] hover:text-[#E0E0E0] hover:bg-white/5 rounded-xl transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </form>
           </div>
         )}
-        <div ref={messagesEndRef} />
-      </div>
 
-      {/* Contact info form */}
-      {showInfoForm && (
-        <div className="px-4 pb-3">
-          <form
-            onSubmit={handleInfoSubmit}
-            className="bg-white border border-[#E2E8F0] rounded-2xl p-4 space-y-3"
+        {/* Input area */}
+        <div
+          className="px-4 pb-4 pt-2 shrink-0 bg-[#0A0A0A]"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}
+        >
+          <div
+            className="flex items-center gap-2 rounded-2xl px-4 py-2.5 transition border border-white/10 focus-within:border-[#00C0FF] focus-within:ring-[3px] focus-within:ring-[#00C0FF]/15"
+            style={{ background: '#1A1A1A' }}
           >
-            <p className="text-sm text-[#0F172A] font-medium">Share your contact info</p>
             <input
+              ref={inputRef}
               type="text"
-              required
-              placeholder="Your name"
-              value={nameInput}
-              onChange={(e) => setNameInput(e.target.value)}
-              className="w-full bg-[#F8FAFB] border border-[#E2E8F0] rounded-xl px-3 py-2.5 text-sm text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#0F172A]"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type a message..."
+              disabled={loading}
+              className="flex-1 bg-transparent text-sm text-[#E0E0E0] placeholder-[#707070] focus:outline-none disabled:opacity-50"
             />
-            <input
-              type="email"
-              required
-              placeholder="Your email"
-              value={emailInput}
-              onChange={(e) => setEmailInput(e.target.value)}
-              className="w-full bg-[#F8FAFB] border border-[#E2E8F0] rounded-xl px-3 py-2.5 text-sm text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#0F172A]"
-            />
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                className="flex-1 bg-[#0F172A] hover:bg-[#1E293B] text-white text-sm font-medium py-2 rounded-xl transition-colors"
-              >
-                Submit
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowInfoForm(false)}
-                className="px-3 py-2 text-[#94A3B8] hover:text-[#0F172A] hover:bg-[#F1F5F9] rounded-xl transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </form>
+            <button
+              onClick={() => sendMessage(input)}
+              disabled={!input.trim() || loading}
+              className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors shrink-0 disabled:cursor-not-allowed ${
+                !input.trim() || loading
+                  ? 'bg-[#1A1A1A]'
+                  : 'bg-[#00C0FF] hover:bg-[#007BFF]'
+              }`}
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin text-[#707070]" />
+              ) : (
+                <Send className={`w-3.5 h-3.5 ${!input.trim() ? 'text-[#707070]' : 'text-[#0A0A0A]'}`} />
+              )}
+            </button>
+          </div>
+          <p className="text-center text-[#707070] text-xs mt-2">Powered by Chodex</p>
         </div>
-      )}
 
-      {/* Input */}
-      <div className="px-4 pb-4 pt-2 shrink-0 bg-white border-t border-[#E2E8F0]">
-        <div className="flex items-center gap-2 bg-[#F8FAFB] border border-[#E2E8F0] rounded-2xl px-4 py-2.5 focus-within:ring-2 focus-within:ring-[#0F172A] focus-within:border-transparent transition">
-          <input
-            ref={inputRef}
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type a message..."
-            disabled={loading}
-            className="flex-1 bg-transparent text-sm text-[#0F172A] placeholder-[#94A3B8] focus:outline-none disabled:opacity-50"
-          />
-          <button
-            onClick={() => sendMessage(input)}
-            disabled={!input.trim() || loading}
-            className="w-8 h-8 bg-[#0F172A] hover:bg-[#1E293B] disabled:opacity-40 disabled:cursor-not-allowed rounded-xl flex items-center justify-center transition-colors shrink-0"
-          >
-            {loading ? (
-              <Loader2 className="w-4 h-4 animate-spin text-white" />
-            ) : (
-              <Send className="w-3.5 h-3.5 text-white" />
-            )}
-          </button>
-        </div>
-        <p className="text-center text-[#94A3B8] text-xs mt-2">Powered by Chodex</p>
       </div>
-    </div>
+    </>
   );
 }
