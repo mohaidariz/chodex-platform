@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Calendar, List, X, Clock, Mail, User, Hash } from 'lucide-react';
+import { Calendar, List, X, Mail, User, Hash } from 'lucide-react';
 
 interface Booking {
   id: string;
@@ -48,14 +48,6 @@ function fmtTime(iso: string, tz: string) {
   });
 }
 
-function fmtDate(iso: string, tz: string) {
-  return new Date(iso).toLocaleDateString('en-US', {
-    timeZone: tz,
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
-}
 
 function getLocalDateStr(iso: string, tz: string): string {
   return new Date(iso).toLocaleDateString('en-CA', { timeZone: tz });

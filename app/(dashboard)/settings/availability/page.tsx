@@ -316,7 +316,7 @@ export default function AvailabilityPage() {
             </div>
           )}
           <p className="text-xs text-gray-600 mt-3">
-            Times are stored in UTC. Enter times in your browser's local timezone.
+            Times are stored in UTC. Enter times in your browser&apos;s local timezone.
           </p>
         </div>
 
