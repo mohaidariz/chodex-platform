@@ -65,6 +65,38 @@ export interface Learning {
   created_at: string;
 }
 
+export interface AvailabilityRule {
+  id: string;
+  org_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AvailabilityBlackout {
+  id: string;
+  org_id: string;
+  start_at: string;
+  end_at: string;
+  reason?: string;
+  created_at: string;
+}
+
+export interface Booking {
+  id: string;
+  org_id: string;
+  booking_code: string;
+  visitor_name: string;
+  visitor_email: string;
+  description: string;
+  start_at: string;
+  end_at: string;
+  status: 'confirmed' | 'cancelled';
+  created_at: string;
+}
+
 export interface EmailLog {
   id: string;
   org_id: string;

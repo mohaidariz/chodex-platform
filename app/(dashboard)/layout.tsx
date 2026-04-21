@@ -1,13 +1,14 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { LayoutDashboard, FileText, MessageSquare, Code2, Settings } from 'lucide-react';
+import { LayoutDashboard, FileText, MessageSquare, Code2, Settings, CalendarDays } from 'lucide-react';
 import { SignOutButton } from './components/SignOutButton';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/documents', label: 'Documents', icon: FileText },
   { href: '/conversations', label: 'Conversations', icon: MessageSquare },
+  { href: '/bookings', label: 'Bookings', icon: CalendarDays },
   { href: '/embed', label: 'Widget', icon: Code2 },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];

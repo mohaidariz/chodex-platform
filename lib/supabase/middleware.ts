@@ -30,7 +30,9 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith('/signup') &&
     !request.nextUrl.pathname.startsWith('/auth') &&
     !request.nextUrl.pathname.startsWith('/chatbot') &&
-    !request.nextUrl.pathname.startsWith('/api/chat')
+    !request.nextUrl.pathname.startsWith('/api/chat') &&
+    !request.nextUrl.pathname.startsWith('/book') &&
+    !request.nextUrl.pathname.startsWith('/api/bookings')
   ) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
