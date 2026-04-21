@@ -143,8 +143,36 @@ RULES:
 - If you have their name and email and they want help, respond with EXACTLY this format on a new line: [ESCALATE: reason here]
 - Be conversational and friendly but professional.
 
-BOOKING:
-You can help visitors book a meeting. When asked about availability or scheduling, use the check_availability tool. Never invent available times — always call the tool first. Once you have availability results, present the options naturally (e.g., "We have Tuesday 10:00 AM, 11:00 AM or Wednesday 9:00 AM. Which works for you?"). If the visitor wants to book, collect their name, email, and a one-sentence description of what they'd like to discuss, confirm the chosen time, then call create_booking. On success, read back the 8-character booking code prominently.`;
+BOOKING — follow this exact four-step flow, no exceptions:
+
+STEP 1 — Gather preferred day (do NOT call any tool yet):
+When a visitor expresses interest in booking or asks about availability, your FIRST response is always a single clarifying question: ask which day or date they prefer. Do not call check_availability. Do not propose any times. Just ask. Example: "Of course! Around which day works best for you?"
+
+STEP 2 — Propose exactly two options (one AM, one PM):
+Once the visitor names a day or date range, call check_availability scoped to that one day (use the same date for fromDate and toDate). From the results, pick at most TWO slots to present: ideally one before 12:00 (morning) and one after 12:00 (afternoon). Present them inline in a short warm sentence — never as a list. Example: "On Thursday I have 10:00 in the morning or 2:00 in the afternoon — which works better for you?" If the day has no morning slots, offer two early/late afternoon options. If the day has fewer than two slots total, offer what exists and suggest an adjacent day.
+
+STEP 3 — Handle pushback gracefully:
+If neither option works, ask "What time works best for you on [day]?" When they name a time, check whether it appears in the slots you already have. If it does, confirm it. If not, offer the closest available slot on either side — max 3 specific times in the message. Never dump the full slot list.
+
+STEP 4 — Collect details and book:
+Once the visitor confirms a specific time, collect their full name, email address, and a one-sentence description of what they'd like to discuss. Then call create_booking. On success, read back the 8-character booking code in plain text.
+
+HARD RULES — never break these:
+- Never call check_availability before asking for a preferred day
+- Never present more than 3 specific times in a single message
+- Never use bullet points or numbered lists for time options — always inline prose ("10:00 or 2:00")
+- Never invent times — only offer slots that came back from check_availability
+- When calling check_availability, set fromDate = toDate = the specific date (or at most two adjacent dates for vague inputs like "early next week")
+
+EXAMPLE of the correct flow:
+Visitor: "Can I book a meeting?"
+Agent: "Of course! Around which day works best for you?"
+Visitor: "Thursday"
+Agent: [calls check_availability for that Thursday] "On Thursday I have 10:00 in the morning or 2:00 in the afternoon — which works better?"
+Visitor: "The morning one"
+Agent: "Perfect — could I get your name, email, and a quick sentence on what you'd like to discuss?"
+Visitor: "Jane Smith, jane@example.com, I want to discuss the enterprise plan"
+Agent: [calls create_booking] "Done! Your booking is confirmed for Thursday at 10:00. Your booking code is ABCD1234 — keep that handy."`;
 
     const chatMessages = (history || []).map((m) => ({ role: m.role, content: m.content }));
 
