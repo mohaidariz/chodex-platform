@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { searchDocuments } from '@/lib/documents/search';
 import { generateChatResponseWithTools, type AzureTool, type ToolExecutor } from '@/lib/openai/chat';
-import { sendEscalationEmail } from '@/lib/email/send';
+import { sendEscalationEmail, sendBookingConfirmationEmail, sendBookingNotificationEmail, sendCancellationConfirmationEmail, sendCancellationNotificationEmail } from '@/lib/email/send';
 import { getAvailableSlots } from '@/lib/booking/availability';
 import { createBooking } from '@/lib/booking/create';
-import { sendBookingConfirmationEmail, sendBookingNotificationEmail } from '@/lib/email/send';
 
 const BOOKING_TOOLS: AzureTool[] = [
   {
@@ -54,6 +53,22 @@ const BOOKING_TOOLS: AzureTool[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'cancel_booking',
+      description:
+        'Cancel an existing booking. Requires the 8-character booking code and the email address used when the booking was created.',
+      parameters: {
+        type: 'object',
+        properties: {
+          bookingCode: { type: 'string', description: 'The 8-character booking code (case-insensitive)' },
+          email: { type: 'string', description: 'Email address used when the booking was made' },
+        },
+        required: ['bookingCode', 'email'],
+      },
+    },
+  },
 ];
 
 export async function POST(request: NextRequest) {
@@ -69,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     const { data: org } = await supabase
       .from('organizations')
-      .select('id, name, timezone')
+      .select('id, name, timezone, cancellation_contact')
       .eq('slug', orgSlug)
       .single();
     if (!org) return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
@@ -172,7 +187,17 @@ Agent: [calls check_availability for that Thursday] "On Thursday I have 10:00 in
 Visitor: "The morning one"
 Agent: "Perfect — could I get your name, email, and a quick sentence on what you'd like to discuss?"
 Visitor: "Jane Smith, jane@example.com, I want to discuss the enterprise plan"
-Agent: [calls create_booking] "Done! Your booking is confirmed for Thursday at 10:00. Your booking code is ABCD1234 — keep that handy."`;
+Agent: [calls create_booking] "Done! Your booking is confirmed for Thursday at 10:00. Your booking code is ABCD1234 — keep that handy."
+
+CANCELLATION — follow this flow:
+
+When a visitor wants to cancel a booking, ask for their booking code and the email address used when booking (if you don't already have both). Then call cancel_booking. Respond to tool results as follows:
+
+- result "not_found": "I couldn't find a booking with that code. Please double-check the 8-character code from your confirmation email."
+- result "email_mismatch": "The email address doesn't match the one used when the booking was made. Please use the same email address."
+- result "already_cancelled": "That booking has already been cancelled."
+- result "too_late": The booking is within 24 hours. If cancellationContact is provided, say: "Unfortunately, bookings can't be cancelled within 24 hours of the start time. To cancel, please contact [cancellationContact] directly." If cancellationContact is null, say: "Unfortunately, bookings can't be cancelled within 24 hours of the start time. Please contact the organization directly."
+- result "success": "Done — your booking [bookingCode] (scheduled for [localTime]) has been cancelled. A confirmation has been sent to your email."`;
 
     const chatMessages = (history || []).map((m) => ({ role: m.role, content: m.content }));
 
@@ -265,6 +290,91 @@ Agent: [calls create_booking] "Done! Your booking is confirmed for Thursday at 1
           start_at: result.startAt,
           end_at: result.endAt,
           local_time: new Date(result.startAt).toLocaleString('en-US', {
+            timeZone: orgTimezone,
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+          }),
+        });
+      }
+
+      if (name === 'cancel_booking') {
+        const { bookingCode, email } = args as Record<string, string>;
+
+        const { data: booking } = await supabase
+          .from('bookings')
+          .select('id, visitor_name, visitor_email, start_at, status')
+          .eq('org_id', org.id)
+          .eq('booking_code', bookingCode.toUpperCase())
+          .maybeSingle();
+
+        if (!booking) {
+          return JSON.stringify({ result: 'not_found' });
+        }
+
+        if (booking.visitor_email.toLowerCase() !== email.toLowerCase()) {
+          return JSON.stringify({ result: 'email_mismatch' });
+        }
+
+        if (booking.status === 'cancelled') {
+          return JSON.stringify({ result: 'already_cancelled' });
+        }
+
+        const hoursUntil = (new Date(booking.start_at).getTime() - Date.now()) / 3_600_000;
+        if (hoursUntil < 24) {
+          return JSON.stringify({
+            result: 'too_late',
+            hoursUntil: Math.round(hoursUntil),
+            cancellationContact: (org as any).cancellation_contact ?? null,
+          });
+        }
+
+        await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', booking.id);
+
+        void (async () => {
+          try {
+            const { data: adminProfile } = await supabase
+              .from('profiles')
+              .select('email')
+              .eq('org_id', org.id)
+              .eq('role', 'admin')
+              .limit(1)
+              .maybeSingle();
+
+            await Promise.all([
+              sendCancellationConfirmationEmail({
+                toEmail: booking.visitor_email,
+                visitorName: booking.visitor_name,
+                orgName: (org as any).name,
+                bookingCode: bookingCode.toUpperCase(),
+                startAt: booking.start_at,
+                timezone: orgTimezone,
+              }),
+              (adminProfile?.email || process.env.EMAIL_TO)
+                ? sendCancellationNotificationEmail({
+                    toEmail: adminProfile?.email || process.env.EMAIL_TO!,
+                    visitorName: booking.visitor_name,
+                    visitorEmail: booking.visitor_email,
+                    orgName: (org as any).name,
+                    bookingCode: bookingCode.toUpperCase(),
+                    startAt: booking.start_at,
+                    timezone: orgTimezone,
+                  })
+                : Promise.resolve(),
+            ]);
+          } catch (e) {
+            console.error('Post-cancellation email error:', e);
+          }
+        })();
+
+        return JSON.stringify({
+          result: 'success',
+          visitorName: booking.visitor_name,
+          bookingCode: bookingCode.toUpperCase(),
+          localTime: new Date(booking.start_at).toLocaleString('en-US', {
             timeZone: orgTimezone,
             weekday: 'long',
             month: 'long',

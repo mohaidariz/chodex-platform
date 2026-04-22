@@ -10,7 +10,7 @@ export async function GET() {
     const serviceClient = createServiceRoleClient();
     const { data: profile } = await serviceClient
       .from('profiles')
-      .select('org_id, organizations(timezone, slot_duration_minutes)')
+      .select('org_id, organizations(timezone, slot_duration_minutes, cancellation_contact)')
       .eq('id', user.id)
       .single();
 
@@ -33,6 +33,7 @@ export async function GET() {
     return NextResponse.json({
       timezone: org?.timezone ?? 'Europe/Stockholm',
       slotDuration: org?.slot_duration_minutes ?? 30,
+      cancellationContact: org?.cancellation_contact ?? '',
       rules: (rules || []).map((r: any) => ({
         dayOfWeek: r.day_of_week,
         startTime: r.start_time,
@@ -66,12 +67,12 @@ export async function POST(request: NextRequest) {
     const orgId = profile?.org_id;
     if (!orgId) return NextResponse.json({ error: 'Org not found' }, { status: 403 });
 
-    const { timezone, slotDuration, rules, blackouts } = await request.json();
+    const { timezone, slotDuration, cancellationContact, rules, blackouts } = await request.json();
 
     // Update org settings
     await serviceClient
       .from('organizations')
-      .update({ timezone, slot_duration_minutes: slotDuration })
+      .update({ timezone, slot_duration_minutes: slotDuration, cancellation_contact: cancellationContact || null })
       .eq('id', orgId);
 
     // Replace all availability rules

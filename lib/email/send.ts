@@ -108,3 +108,62 @@ export async function sendBookingNotificationEmail(params: {
     `,
   });
 }
+
+export async function sendCancellationConfirmationEmail(params: {
+  toEmail: string;
+  visitorName: string;
+  orgName: string;
+  bookingCode: string;
+  startAt: string;
+  timezone: string;
+}) {
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  if (!process.env.RESEND_API_KEY) return;
+
+  const localTime = formatLocalTime(params.startAt, params.timezone);
+
+  await resend.emails.send({
+    from: process.env.EMAIL_FROM || 'Chodex <noreply@chodex.se>',
+    to: params.toEmail,
+    subject: `Booking cancelled — ${params.bookingCode}`,
+    html: `
+      <h2>Your booking has been cancelled</h2>
+      <p>Hi ${params.visitorName},</p>
+      <p>Your meeting with <strong>${params.orgName}</strong> has been cancelled.</p>
+      <table style="border-collapse:collapse;margin:16px 0;">
+        <tr><td style="padding:4px 12px 4px 0;color:#666;">Booking code</td><td style="font-family:monospace;">${params.bookingCode}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666;">Was scheduled for</td><td>${localTime}</td></tr>
+      </table>
+      <p style="color:#666;font-size:14px;">If you did not request this cancellation, please contact the organization directly.</p>
+    `,
+  });
+}
+
+export async function sendCancellationNotificationEmail(params: {
+  toEmail: string;
+  visitorName: string;
+  visitorEmail: string;
+  orgName: string;
+  bookingCode: string;
+  startAt: string;
+  timezone: string;
+}) {
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  if (!process.env.RESEND_API_KEY) return;
+
+  const localTime = formatLocalTime(params.startAt, params.timezone);
+
+  await resend.emails.send({
+    from: process.env.EMAIL_FROM || 'Chodex <noreply@chodex.se>',
+    to: params.toEmail,
+    subject: `Booking cancelled by ${params.visitorName} — ${params.bookingCode}`,
+    html: `
+      <h2>Booking cancelled for ${params.orgName}</h2>
+      <table style="border-collapse:collapse;margin:16px 0;">
+        <tr><td style="padding:4px 12px 4px 0;color:#666;">Visitor</td><td>${params.visitorName} &lt;${params.visitorEmail}&gt;</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666;">Booking code</td><td style="font-family:monospace;">${params.bookingCode}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666;">Was scheduled for</td><td>${localTime}</td></tr>
+      </table>
+    `,
+  });
+}

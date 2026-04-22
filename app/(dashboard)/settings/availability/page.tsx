@@ -75,6 +75,7 @@ const defaultRules = (): RuleState[] =>
 export default function AvailabilityPage() {
   const [timezone, setTimezone] = useState('Europe/Stockholm');
   const [slotDuration, setSlotDuration] = useState(30);
+  const [cancellationContact, setCancellationContact] = useState('');
   const [rules, setRules] = useState<RuleState[]>(defaultRules());
   const [blackouts, setBlackouts] = useState<BlackoutState[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,6 +88,7 @@ export default function AvailabilityPage() {
       .then((data) => {
         setTimezone(data.timezone ?? 'Europe/Stockholm');
         setSlotDuration(data.slotDuration ?? 30);
+        setCancellationContact(data.cancellationContact ?? '');
 
         const loaded = defaultRules();
         for (const r of data.rules ?? []) {
@@ -141,7 +143,7 @@ export default function AvailabilityPage() {
       const res = await fetch('/api/settings/availability', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ timezone, slotDuration, rules, blackouts }),
+        body: JSON.stringify({ timezone, slotDuration, cancellationContact, rules, blackouts }),
       });
       if (res.ok) {
         setSaved(true);
@@ -318,6 +320,23 @@ export default function AvailabilityPage() {
           <p className="text-xs text-gray-600 mt-3">
             Times are stored in UTC. Enter times in your browser&apos;s local timezone.
           </p>
+        </div>
+
+        {/* Cancellation contact */}
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-2">
+            Cancellation contact
+          </h3>
+          <p className="text-xs text-gray-500 mb-4">
+            Shown to visitors who try to cancel within 24 hours of their booking. Leave blank to show a generic message.
+          </p>
+          <input
+            type="text"
+            placeholder="e.g. hello@company.com or +46 70 123 45 67"
+            value={cancellationContact}
+            onChange={(e) => setCancellationContact(e.target.value)}
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-indigo-500"
+          />
         </div>
 
         {/* Save */}
