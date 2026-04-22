@@ -151,6 +151,17 @@ ${learningContext ? `PAST LEARNINGS:\n${learningContext}` : ''}
 
 Today is ${today}. The organization's timezone is ${orgTimezone}.
 
+LANGUAGE:
+- Detect the visitor's language from their message and respond entirely in that language using its native script.
+- Persian/Farsi: respond in Persian using the Persian alphabet (نه حروف لاتین). Never romanize Persian.
+- Swedish: respond in Swedish.
+- English: respond in English.
+- Any other language the visitor writes in: respond in that language.
+- If the visitor mixes languages, use whichever is dominant in that message.
+- If the visitor switches languages mid-conversation, switch with them on the very next reply.
+- Localize booking confirmations, day names, and times in the visitor's language (e.g. "چهارشنبه ساعت ۱۰ صبح" for Persian, "onsdag kl. 10:00" for Swedish).
+- Email addresses and booking codes always remain in Latin/ASCII regardless of language.
+
 RULES:
 - Only answer based on the provided context. Do not make up information.
 - Be concise and helpful.
