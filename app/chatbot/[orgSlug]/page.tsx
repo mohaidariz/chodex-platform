@@ -16,16 +16,16 @@ interface ChatState {
 }
 
 type VoiceState = 'idle' | 'listening' | 'processing' | 'speaking';
+type VoiceModalKind = 'inapp' | 'denied' | 'unsupported';
 
 function getSupportedMimeType(): string {
   if (typeof MediaRecorder === 'undefined') return '';
-  // isTypeSupported may not exist on some early MediaRecorder implementations
   if (typeof MediaRecorder.isTypeSupported !== 'function') return '';
   const candidates = [
     'audio/webm;codecs=opus',
     'audio/webm',
     'audio/ogg;codecs=opus',
-    'audio/mp4',  // Safari / iOS — must be last so Chrome still picks webm
+    'audio/mp4',
   ];
   for (const t of candidates) {
     if (MediaRecorder.isTypeSupported(t)) return t;
@@ -33,22 +33,139 @@ function getSupportedMimeType(): string {
   return '';
 }
 
-const MIC_ERRORS: Record<string, string> = {
-  NotAllowedError:
-    'Microphone access was denied. Go to your browser settings, allow this site to use the microphone, then reload the page.',
-  PermissionDeniedError:
-    'Microphone access was denied. Go to your browser settings, allow this site to use the microphone, then reload the page.',
-  NotFoundError: 'No microphone found. Please connect a microphone and try again.',
-  NotReadableError:
-    'Microphone is in use by another app. Close other apps using the mic and try again.',
-  OverconstrainedError:
-    'Your device microphone does not meet the required audio settings. Please try again.',
-  AbortError: 'Recording was interrupted. Please try again.',
-  NotSupportedError:
-    'Audio recording is not supported in this browser. Please update to Safari 14.3+ or use Chrome.',
-  SecurityError:
-    'Microphone access is blocked by a security policy. This feature requires HTTPS.',
-};
+function isInAppBrowser(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /FBAN|FBAV|Instagram|LinkedInApp|Twitter|TikTok|Slack/i.test(navigator.userAgent);
+}
+
+function checkVoiceSupport(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  if (!navigator.mediaDevices) return false;
+  if (typeof MediaRecorder === 'undefined') return false;
+  return !!getSupportedMimeType();
+}
+
+function VoicePermissionModal({ kind, onClose }: { kind: VoiceModalKind; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  function copyLink() {
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    });
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end md:items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.72)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        className="w-full md:max-w-[400px] md:mx-4 rounded-t-2xl md:rounded-2xl p-6 space-y-4"
+        style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.09)' }}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-base font-semibold text-[#E0E0E0] leading-snug">
+            {kind === 'inapp'
+              ? 'Open in your browser'
+              : kind === 'denied'
+              ? 'Allow microphone access'
+              : 'Voice not supported'}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-[#707070] hover:text-[#A0A0A0] transition-colors shrink-0 mt-0.5"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {kind === 'inapp' && (
+          <>
+            <p className="text-sm text-[#A0A0A0] leading-relaxed">
+              Voice mode requires microphone access, which is not available inside Instagram,
+              Facebook, LinkedIn, and similar in-app browsers. Open this page in Safari or Chrome
+              to use voice.
+            </p>
+            <button
+              onClick={copyLink}
+              className="w-full py-3 rounded-xl text-sm font-semibold text-[#0A0A0A] transition-colors"
+              style={{ background: copied ? '#22c55e' : '#00C0FF' }}
+            >
+              {copied ? 'Link copied!' : 'Copy link to open in Safari'}
+            </button>
+            <button
+              onClick={onClose}
+              className="w-full py-2.5 rounded-xl text-sm text-[#A0A0A0] hover:text-[#E0E0E0] hover:bg-white/5 transition-colors"
+            >
+              Continue with text only
+            </button>
+          </>
+        )}
+
+        {kind === 'denied' && (
+          <>
+            <p className="text-sm text-[#A0A0A0] leading-relaxed">
+              Microphone access was blocked. To enable it on your iPhone or iPad:
+            </p>
+            <ol className="space-y-2.5 text-sm text-[#A0A0A0]">
+              <li className="flex gap-2.5">
+                <span className="text-[#00C0FF] font-semibold shrink-0">1.</span>
+                <span>Open the <strong className="text-[#E0E0E0]">Settings</strong> app</span>
+              </li>
+              <li className="flex gap-2.5">
+                <span className="text-[#00C0FF] font-semibold shrink-0">2.</span>
+                <span>Scroll down and tap <strong className="text-[#E0E0E0]">Safari</strong> (or Chrome)</span>
+              </li>
+              <li className="flex gap-2.5">
+                <span className="text-[#00C0FF] font-semibold shrink-0">3.</span>
+                <span>
+                  Tap <strong className="text-[#E0E0E0]">Microphone</strong>, then select{' '}
+                  <strong className="text-[#E0E0E0]">Allow</strong>
+                </span>
+              </li>
+              <li className="flex gap-2.5">
+                <span className="text-[#00C0FF] font-semibold shrink-0">4.</span>
+                <span>Come back here and tap the mic again</span>
+              </li>
+            </ol>
+            <button
+              onClick={onClose}
+              className="w-full py-3 rounded-xl text-sm font-semibold text-[#0A0A0A] bg-[#00C0FF] hover:bg-[#007BFF] transition-colors"
+            >
+              Try again
+            </button>
+            <button
+              onClick={onClose}
+              className="w-full py-2.5 rounded-xl text-sm text-[#A0A0A0] hover:text-[#E0E0E0] hover:bg-white/5 transition-colors"
+            >
+              Continue with text only
+            </button>
+          </>
+        )}
+
+        {kind === 'unsupported' && (
+          <>
+            <p className="text-sm text-[#A0A0A0] leading-relaxed">
+              Voice mode is not supported in this browser. Please open this page in Safari 14.3+
+              or Chrome to use voice interaction.
+            </p>
+            <button
+              onClick={onClose}
+              className="w-full py-3 rounded-xl text-sm font-medium text-[#E0E0E0] hover:bg-white/5 border transition-colors"
+              style={{ borderColor: 'rgba(255,255,255,0.15)' }}
+            >
+              Continue with text only
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function ChatbotPage({ params }: { params: { orgSlug: string } }) {
   const { orgSlug } = params;
@@ -64,7 +181,9 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
 
   // Voice state
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
-  const [micError, setMicError] = useState('');
+  const [voiceModal, setVoiceModal] = useState<VoiceModalKind | null>(null);
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const [showMicHint, setShowMicHint] = useState(false);
   const [muted, setMuted] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem('chodex-voice-muted') === 'true';
@@ -82,6 +201,11 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
   }, [messages]);
 
   useEffect(() => {
+    const supported = checkVoiceSupport();
+    setVoiceSupported(supported);
+    if (supported) {
+      setShowMicHint(localStorage.getItem('chodex-mic-hint-shown') !== 'true');
+    }
     return () => {
       audioRef.current?.pause();
       streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -117,10 +241,18 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to get response');
-      setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: data.response }]);
+      setMessages((prev) => [
+        ...prev,
+        { id: (Date.now() + 1).toString(), role: 'assistant', content: data.response },
+      ]);
       setState((prev) => ({ ...prev, conversationId: data.conversationId }));
       const lower = data.response.toLowerCase();
-      if (!state.visitorName && (lower.includes('your name') || lower.includes('name and email') || lower.includes('contact information'))) {
+      if (
+        !state.visitorName &&
+        (lower.includes('your name') ||
+          lower.includes('name and email') ||
+          lower.includes('contact information'))
+      ) {
         setShowInfoForm(true);
       }
     } catch {
@@ -145,9 +277,7 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
 
   async function sendVoiceMessage(audioBlob: Blob) {
     setVoiceState('processing');
-    setMicError('');
     try {
-      // Use the correct extension so servers and Whisper identify the container
       const ext = (audioBlob.type || '').includes('mp4') ? 'm4a' : 'webm';
       const form = new FormData();
       form.append('audio', audioBlob, `recording.${ext}`);
@@ -162,7 +292,6 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
       if (!res.ok) throw new Error(data.error || 'Voice processing failed');
 
       const { transcript, response, conversationId, audioBase64 } = data;
-
       setMessages((prev) => [
         ...prev,
         { id: Date.now().toString(), role: 'user', content: transcript },
@@ -175,14 +304,11 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
       } else {
         setVoiceState('idle');
       }
-    } catch (err: any) {
-      setMicError(err.message || 'Voice processing failed. Please try again.');
+    } catch {
       setVoiceState('idle');
     }
   }
 
-  // Called once getUserMedia resolves — sets up and starts the MediaRecorder.
-  // Kept separate so getUserMedia can be called synchronously in the event handler.
   function setupRecorder(stream: MediaStream) {
     console.log('[voice] stream acquired, setting up recorder');
     streamRef.current = stream;
@@ -194,7 +320,6 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
     try {
       recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
     } catch (err: any) {
-      // Construction with specific mimeType failed — try bare constructor
       console.warn('[voice] MediaRecorder with mimeType failed, retrying without:', err.message);
       try {
         recorder = new MediaRecorder(stream);
@@ -202,13 +327,12 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
         console.error('[voice] MediaRecorder construction failed entirely:', err2);
         stream.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
-        setMicError('Audio recording is not supported in this browser. Please update to Safari 14.3+ or use Chrome.');
+        setVoiceModal('unsupported');
         setVoiceState('idle');
         return;
       }
     }
 
-    // Use what the recorder actually negotiated, not our guess
     const actualMimeType = recorder.mimeType || mimeType || 'audio/mp4';
     console.log('[voice] recorder.mimeType:', actualMimeType);
 
@@ -255,43 +379,47 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
     }
     if (voiceState !== 'idle') return;
 
-    // iOS Safari PWA/home-screen mode blocks getUserMedia entirely
-    if (typeof window !== 'undefined' && (window.navigator as any).standalone === true) {
-      setMicError("Voice mode doesn't work when the site is added to the home screen. Open it in Safari directly.");
+    // Check in-app browser before anything else
+    if (isInAppBrowser()) {
+      setVoiceModal('inapp');
       return;
     }
 
-    // Feature checks — give a clear error before touching getUserMedia
+    // PWA / home-screen mode blocks getUserMedia on iOS
+    if (typeof window !== 'undefined' && (window.navigator as any).standalone === true) {
+      setVoiceModal('unsupported');
+      return;
+    }
+
     if (!navigator.mediaDevices?.getUserMedia) {
-      setMicError('Voice recording requires HTTPS and a modern browser (Chrome 49+ or Safari 14.3+).');
+      setVoiceModal('unsupported');
       return;
     }
     if (typeof MediaRecorder === 'undefined') {
-      setMicError('Voice recording is not supported in this browser. Please update to Safari 14.3+ or use Chrome.');
+      setVoiceModal('unsupported');
       return;
     }
 
-    setMicError('');
+    // Dismiss first-use hint
+    if (showMicHint) {
+      setShowMicHint(false);
+      localStorage.setItem('chodex-mic-hint-shown', 'true');
+    }
+
     audioRef.current?.pause();
 
-    // ⚠️ iOS Safari requires getUserMedia to be called synchronously inside a user gesture.
-    // Using .then() here (not async/await) keeps this call in the same synchronous task.
+    // ⚠️ iOS Safari requires getUserMedia in the same synchronous task as the gesture.
     console.log('[voice] requesting microphone access...');
     navigator.mediaDevices
-      .getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          channelCount: 1,
-          // Do NOT specify sampleRate — bare values like 16000 are treated as exact
-          // constraints on some Safari versions and cause NotAllowedError when the
-          // device can't satisfy them, even though mic permission was granted.
-        },
-      })
+      .getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } })
       .then((stream) => setupRecorder(stream))
       .catch((err: any) => {
         console.error('[voice] getUserMedia error:', err.name, err.message, err);
-        setMicError(MIC_ERRORS[err.name] || err.message || 'Could not access microphone. Please try again.');
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          setVoiceModal('denied');
+        } else {
+          setVoiceModal('unsupported');
+        }
         setVoiceState('idle');
       });
   }
@@ -311,7 +439,11 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
       ...prev,
       { id: Date.now().toString(), role: 'user', content: `My name is ${nameInput} and my email is ${emailInput}` },
     ]);
-    await sendTextMessage(`My name is ${nameInput} and my email is ${emailInput}. Please connect me with the team.`, nameInput, emailInput);
+    await sendTextMessage(
+      `My name is ${nameInput} and my email is ${emailInput}. Please connect me with the team.`,
+      nameInput,
+      emailInput
+    );
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -344,7 +476,16 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
           50% { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
         }
         .mic-listening { animation: mic-pulse 1s ease-in-out infinite; border-radius: 12px; }
+        @keyframes slide-up {
+          from { transform: translateY(20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        .modal-enter { animation: slide-up 0.2s ease-out; }
       `}</style>
+
+      {voiceModal && (
+        <VoicePermissionModal kind={voiceModal} onClose={() => setVoiceModal(null)} />
+      )}
 
       <div className="flex flex-col h-screen bg-[#0A0A0A] text-[#E0E0E0]">
 
@@ -366,15 +507,16 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
               <p className="text-xs text-[#A0A0A0]">Online</p>
             </div>
           </div>
-          {/* Mute toggle */}
-          <button
-            onClick={toggleMute}
-            title={muted ? 'Unmute voice responses' : 'Mute voice responses'}
-            className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors"
-            style={{ color: muted ? '#707070' : '#A0A0A0' }}
-          >
-            {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-          </button>
+          {voiceSupported && (
+            <button
+              onClick={toggleMute}
+              title={muted ? 'Unmute voice responses' : 'Mute voice responses'}
+              className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors"
+              style={{ color: muted ? '#707070' : '#A0A0A0' }}
+            >
+              {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            </button>
+          )}
         </div>
 
         {/* Messages */}
@@ -484,11 +626,15 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
           </div>
         )}
 
-        {/* Mic error */}
-        {micError && (
-          <div className="mx-4 mb-2 px-3 py-2 rounded-xl text-xs text-red-400 bg-red-500/10 border border-red-500/20 flex items-start gap-2">
-            <span className="shrink-0 mt-px">⚠</span>
-            <span>{micError}</span>
+        {/* Stop speaking button */}
+        {voiceState === 'speaking' && (
+          <div className="px-4 pb-2">
+            <button
+              onClick={() => { audioRef.current?.pause(); setVoiceState('idle'); }}
+              className="w-full py-2.5 rounded-xl text-sm font-medium text-[#00C0FF] border border-[#00C0FF]/30 hover:bg-[#00C0FF]/10 transition-colors"
+            >
+              Stop speaking
+            </button>
           </div>
         )}
 
@@ -507,52 +653,57 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={
-                voiceState === 'listening' ? 'Listening…' :
-                voiceState === 'processing' ? 'Thinking…' :
-                'Type a message…'
+                voiceState === 'listening'
+                  ? 'Listening…'
+                  : voiceState === 'processing'
+                  ? 'Thinking…'
+                  : 'Type a message…'
               }
               disabled={isTextDisabled}
               className="flex-1 bg-transparent text-sm text-[#E0E0E0] placeholder-[#707070] focus:outline-none disabled:opacity-50"
             />
 
-            {/* Mic button — hold to record, tap to stop speaking */}
-            <button
-              onPointerDown={handleMicPointerDown}
-              onPointerUp={handleMicPointerUp}
-              onPointerCancel={handleMicPointerUp}
-              disabled={voiceState === 'processing' || loading}
-              aria-label={
-                voiceState === 'listening' ? 'Release to send' :
-                voiceState === 'speaking' ? 'Tap to stop audio' :
-                'Hold to record'
-              }
-              style={{ touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
-              className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all shrink-0 ${
-                voiceState === 'processing' || loading
-                  ? 'opacity-30 cursor-not-allowed'
-                  : voiceState === 'listening'
-                  ? 'mic-listening cursor-pointer bg-red-500/15'
-                  : voiceState === 'speaking'
-                  ? 'cursor-pointer'
-                  : 'cursor-pointer text-[#707070] hover:text-[#A0A0A0] hover:bg-white/5'
-              }`}
-            >
-              {voiceState === 'listening' ? (
-                <Mic className="w-4 h-4 text-red-400" />
-              ) : voiceState === 'speaking' ? (
-                // Animated waveform bars
-                <div className="flex items-end gap-[2px] h-4 w-4 justify-center" style={{ paddingBottom: '1px' }}>
-                  <span className="bar1 block rounded-sm bg-[#00C0FF]" style={{ width: 3, height: 8, transformOrigin: 'bottom' }} />
-                  <span className="bar2 block rounded-sm bg-[#00C0FF]" style={{ width: 3, height: 12, transformOrigin: 'bottom' }} />
-                  <span className="bar3 block rounded-sm bg-[#00C0FF]" style={{ width: 3, height: 10, transformOrigin: 'bottom' }} />
-                  <span className="bar4 block rounded-sm bg-[#00C0FF]" style={{ width: 3, height: 6, transformOrigin: 'bottom' }} />
-                </div>
-              ) : voiceState === 'processing' ? (
-                <Loader2 className="w-4 h-4 animate-spin text-[#707070]" />
-              ) : (
-                <Mic className="w-4 h-4" />
-              )}
-            </button>
+            {/* Mic button — only shown when voice is supported */}
+            {voiceSupported && (
+              <button
+                onPointerDown={handleMicPointerDown}
+                onPointerUp={handleMicPointerUp}
+                onPointerCancel={handleMicPointerUp}
+                disabled={voiceState === 'processing' || loading}
+                aria-label={
+                  voiceState === 'listening'
+                    ? 'Release to send'
+                    : voiceState === 'speaking'
+                    ? 'Tap to stop audio'
+                    : 'Hold to record'
+                }
+                style={{ touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
+                className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all shrink-0 ${
+                  voiceState === 'processing' || loading
+                    ? 'opacity-30 cursor-not-allowed'
+                    : voiceState === 'listening'
+                    ? 'mic-listening cursor-pointer bg-red-500/15'
+                    : voiceState === 'speaking'
+                    ? 'cursor-pointer'
+                    : 'cursor-pointer text-[#707070] hover:text-[#A0A0A0] hover:bg-white/5'
+                }`}
+              >
+                {voiceState === 'listening' ? (
+                  <Mic className="w-4 h-4 text-red-400" />
+                ) : voiceState === 'speaking' ? (
+                  <div className="flex items-end gap-[2px] h-4 w-4 justify-center" style={{ paddingBottom: '1px' }}>
+                    <span className="bar1 block rounded-sm bg-[#00C0FF]" style={{ width: 3, height: 8, transformOrigin: 'bottom' }} />
+                    <span className="bar2 block rounded-sm bg-[#00C0FF]" style={{ width: 3, height: 12, transformOrigin: 'bottom' }} />
+                    <span className="bar3 block rounded-sm bg-[#00C0FF]" style={{ width: 3, height: 10, transformOrigin: 'bottom' }} />
+                    <span className="bar4 block rounded-sm bg-[#00C0FF]" style={{ width: 3, height: 6, transformOrigin: 'bottom' }} />
+                  </div>
+                ) : voiceState === 'processing' ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-[#707070]" />
+                ) : (
+                  <Mic className="w-4 h-4" />
+                )}
+              </button>
+            )}
 
             {/* Send button */}
             <button
@@ -570,16 +721,28 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
             </button>
           </div>
 
-          {/* Status line */}
-          <p className="text-center text-xs mt-2 select-none">
-            {voiceState === 'listening' ? (
-              <span className="text-red-400">● Recording — release to send</span>
-            ) : voiceState === 'speaking' ? (
-              <span className="text-[#00C0FF]">Speaking — tap mic to stop</span>
-            ) : (
-              <span className="text-[#707070]">Powered by Chodex</span>
+          {/* Status / footer line */}
+          <div className="flex items-center justify-center gap-2 mt-2 select-none">
+            <p className="text-xs">
+              {voiceState === 'listening' ? (
+                <span className="text-red-400">&#x25CF; Recording &#x2014; release to send</span>
+              ) : voiceState === 'speaking' ? (
+                <span className="text-[#00C0FF]">Speaking &#x2014; tap mic to stop</span>
+              ) : showMicHint && voiceSupported ? (
+                <span className="text-[#A0A0A0]">Tap the mic to talk</span>
+              ) : (
+                <span className="text-[#707070]">Powered by Chodex</span>
+              )}
+            </p>
+            {voiceSupported && voiceState === 'idle' && !showMicHint && (
+              <button
+                onClick={() => setVoiceModal('denied')}
+                className="text-xs text-[#505050] hover:text-[#707070] underline underline-offset-2 transition-colors"
+              >
+                Need help?
+              </button>
             )}
-          </p>
+          </div>
         </div>
 
       </div>
