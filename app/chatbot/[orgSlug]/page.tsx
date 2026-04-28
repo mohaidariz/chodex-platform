@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2, X } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Send, Bot, User, Loader2, X, Mic, Volume2, VolumeX } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -13,48 +13,77 @@ interface ChatState {
   conversationId: string | null;
   visitorName: string;
   visitorEmail: string;
-  collectingInfo: boolean;
+}
+
+type VoiceState = 'idle' | 'listening' | 'processing' | 'speaking';
+
+function getSupportedMimeType(): string {
+  const candidates = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/ogg;codecs=opus',
+    'audio/mp4',
+  ];
+  if (typeof MediaRecorder === 'undefined') return '';
+  for (const t of candidates) {
+    if (MediaRecorder.isTypeSupported(t)) return t;
+  }
+  return '';
 }
 
 export default function ChatbotPage({ params }: { params: { orgSlug: string } }) {
   const { orgSlug } = params;
   const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content: `Hi! I'm an AI assistant. How can I help you today?`,
-    },
+    { id: 'welcome', role: 'assistant', content: `Hi! I'm an AI assistant. How can I help you today?` },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [state, setState] = useState<ChatState>({
-    conversationId: null,
-    visitorName: '',
-    visitorEmail: '',
-    collectingInfo: false,
-  });
+  const [state, setState] = useState<ChatState>({ conversationId: null, visitorName: '', visitorEmail: '' });
   const [nameInput, setNameInput] = useState('');
   const [emailInput, setEmailInput] = useState('');
   const [showInfoForm, setShowInfoForm] = useState(false);
+
+  // Voice state
+  const [voiceState, setVoiceState] = useState<VoiceState>('idle');
+  const [micError, setMicError] = useState('');
+  const [muted, setMuted] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('chodex-voice-muted') === 'true';
+  });
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const recordingStartRef = useRef<number>(0);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  async function sendMessage(content: string, name?: string, email?: string) {
+  useEffect(() => {
+    return () => {
+      audioRef.current?.pause();
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
+
+  function toggleMute() {
+    const next = !muted;
+    setMuted(next);
+    localStorage.setItem('chodex-voice-muted', String(next));
+    if (next && audioRef.current) {
+      audioRef.current.pause();
+      setVoiceState('idle');
+    }
+  }
+
+  async function sendTextMessage(content: string, name?: string, email?: string) {
     if (!content.trim()) return;
     setLoading(true);
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content,
-    };
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages((prev) => [...prev, { id: Date.now().toString(), role: 'user', content }]);
     setInput('');
-
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -67,82 +96,179 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
           visitorEmail: email || state.visitorEmail || undefined,
         }),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to get response');
-
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: data.response,
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
+      setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: data.response }]);
       setState((prev) => ({ ...prev, conversationId: data.conversationId }));
-
-      const lowerResponse = data.response.toLowerCase();
-      if (
-        !state.visitorName &&
-        (lowerResponse.includes('your name') ||
-          lowerResponse.includes('name and email') ||
-          lowerResponse.includes('contact information'))
-      ) {
+      const lower = data.response.toLowerCase();
+      if (!state.visitorName && (lower.includes('your name') || lower.includes('name and email') || lower.includes('contact information'))) {
         setShowInfoForm(true);
       }
     } catch {
       setMessages((prev) => [
         ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: 'Sorry, I encountered an error. Please try again.',
-        },
+        { id: (Date.now() + 1).toString(), role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' },
       ]);
     } finally {
       setLoading(false);
     }
   }
 
+  const playAudio = useCallback((base64: string) => {
+    audioRef.current?.pause();
+    const audio = new Audio(`data:audio/mpeg;base64,${base64}`);
+    audioRef.current = audio;
+    setVoiceState('speaking');
+    audio.play().catch(() => setVoiceState('idle'));
+    audio.onended = () => setVoiceState('idle');
+    audio.onerror = () => setVoiceState('idle');
+  }, []);
+
+  async function sendVoiceMessage(audioBlob: Blob) {
+    setVoiceState('processing');
+    setMicError('');
+    try {
+      const form = new FormData();
+      form.append('audio', audioBlob, 'recording.webm');
+      form.append('orgSlug', orgSlug);
+      if (state.conversationId) form.append('conversationId', state.conversationId);
+      if (state.visitorName) form.append('visitorName', state.visitorName);
+      if (state.visitorEmail) form.append('visitorEmail', state.visitorEmail);
+      if (muted) form.append('noAudio', 'true');
+
+      const res = await fetch('/api/voice', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Voice processing failed');
+
+      const { transcript, response, conversationId, audioBase64 } = data;
+
+      setMessages((prev) => [
+        ...prev,
+        { id: Date.now().toString(), role: 'user', content: transcript },
+        { id: (Date.now() + 1).toString(), role: 'assistant', content: response },
+      ]);
+      setState((prev) => ({ ...prev, conversationId }));
+
+      if (!muted && audioBase64) {
+        playAudio(audioBase64);
+      } else {
+        setVoiceState('idle');
+      }
+    } catch (err: any) {
+      setMicError(err.message || 'Voice processing failed. Please try again.');
+      setVoiceState('idle');
+    }
+  }
+
+  async function startRecording() {
+    setMicError('');
+    try {
+      audioRef.current?.pause();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000, channelCount: 1 },
+      });
+      streamRef.current = stream;
+
+      const mimeType = getSupportedMimeType();
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+      recordingStartRef.current = Date.now();
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        const duration = Date.now() - recordingStartRef.current;
+        if (duration < 300 || audioChunksRef.current.length === 0) {
+          setVoiceState('idle');
+          return;
+        }
+        const blob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
+        sendVoiceMessage(blob);
+      };
+
+      recorder.start(100);
+      setVoiceState('listening');
+    } catch (err: any) {
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setMicError('Microphone access needed. Click the lock icon in your browser address bar to enable it.');
+      } else {
+        setMicError(err.message || 'Could not access microphone.');
+      }
+      setVoiceState('idle');
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  }
+
+  function handleMicPointerDown(e: React.PointerEvent) {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    if (voiceState === 'speaking') {
+      audioRef.current?.pause();
+      setVoiceState('idle');
+      return;
+    }
+    if (voiceState === 'idle') {
+      startRecording();
+    }
+  }
+
+  function handleMicPointerUp() {
+    if (voiceState === 'listening') {
+      stopRecording();
+    }
+  }
+
   async function handleInfoSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!nameInput || !emailInput) return;
-    setState((prev) => ({
-      ...prev,
-      visitorName: nameInput,
-      visitorEmail: emailInput,
-    }));
+    setState((prev) => ({ ...prev, visitorName: nameInput, visitorEmail: emailInput }));
     setShowInfoForm(false);
     setMessages((prev) => [
       ...prev,
-      {
-        id: Date.now().toString(),
-        role: 'user',
-        content: `My name is ${nameInput} and my email is ${emailInput}`,
-      },
+      { id: Date.now().toString(), role: 'user', content: `My name is ${nameInput} and my email is ${emailInput}` },
     ]);
-    await sendMessage(
-      `My name is ${nameInput} and my email is ${emailInput}. Please connect me with the team.`,
-      nameInput,
-      emailInput
-    );
+    await sendTextMessage(`My name is ${nameInput} and my email is ${emailInput}. Please connect me with the team.`, nameInput, emailInput);
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      sendMessage(input);
+      sendTextMessage(input);
     }
   }
 
+  const isTextDisabled = loading || voiceState === 'listening' || voiceState === 'processing';
+
   return (
     <>
-      {/* Ensure no white flash on load and dark scrollbar in messages pane */}
       <style>{`
         html, body { background: #0A0A0A !important; }
         .messages-scroll::-webkit-scrollbar { width: 4px; }
         .messages-scroll::-webkit-scrollbar-track { background: transparent; }
         .messages-scroll::-webkit-scrollbar-thumb { background-color: #2a2a2a; border-radius: 4px; }
         .messages-scroll { scrollbar-width: thin; scrollbar-color: #2a2a2a transparent; }
+        @keyframes soundwave {
+          0%, 100% { transform: scaleY(0.35); }
+          50% { transform: scaleY(1); }
+        }
+        .bar1 { animation: soundwave 0.7s ease-in-out infinite; }
+        .bar2 { animation: soundwave 0.7s ease-in-out infinite 0.14s; }
+        .bar3 { animation: soundwave 0.7s ease-in-out infinite 0.28s; }
+        .bar4 { animation: soundwave 0.7s ease-in-out infinite 0.42s; }
+        @keyframes mic-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
+          50% { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+        }
+        .mic-listening { animation: mic-pulse 1s ease-in-out infinite; border-radius: 12px; }
       `}</style>
 
       <div className="flex flex-col h-screen bg-[#0A0A0A] text-[#E0E0E0]">
@@ -154,20 +280,26 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
         >
           <div
             className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
-            style={{
-              background: 'rgba(0,192,255,0.12)',
-              boxShadow: '0 0 12px rgba(0,192,255,0.15)',
-            }}
+            style={{ background: 'rgba(0,192,255,0.12)', boxShadow: '0 0 12px rgba(0,192,255,0.15)' }}
           >
             <Bot className="w-5 h-5 text-[#00C0FF]" />
           </div>
-          <div>
+          <div className="flex-1">
             <p className="text-sm font-semibold text-[#E0E0E0]">AI Assistant</p>
             <div className="flex items-center gap-1.5">
               <div className="w-1.5 h-1.5 rounded-full bg-[#00C0FF] animate-pulse" />
               <p className="text-xs text-[#A0A0A0]">Online</p>
             </div>
           </div>
+          {/* Mute toggle */}
+          <button
+            onClick={toggleMute}
+            title={muted ? 'Unmute voice responses' : 'Mute voice responses'}
+            className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors"
+            style={{ color: muted ? '#707070' : '#A0A0A0' }}
+          >
+            {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          </button>
         </div>
 
         {/* Messages */}
@@ -180,10 +312,7 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
               {msg.role === 'assistant' && (
                 <div
                   className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mb-0.5"
-                  style={{
-                    background: 'rgba(0,192,255,0.12)',
-                    boxShadow: '0 0 12px rgba(0,192,255,0.1)',
-                  }}
+                  style={{ background: 'rgba(0,192,255,0.12)', boxShadow: '0 0 12px rgba(0,192,255,0.1)' }}
                 >
                   <Bot className="w-3.5 h-3.5 text-[#00C0FF]" />
                 </div>
@@ -194,14 +323,8 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
                 }`}
                 style={
                   msg.role === 'user'
-                    ? {
-                        background: 'rgba(0,192,255,0.12)',
-                        border: '1px solid rgba(0,192,255,0.2)',
-                      }
-                    : {
-                        background: '#1A1A1A',
-                        border: '1px solid rgba(255,255,255,0.06)',
-                      }
+                    ? { background: 'rgba(0,192,255,0.12)', border: '1px solid rgba(0,192,255,0.2)' }
+                    : { background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.06)' }
                 }
               >
                 {msg.content}
@@ -217,14 +340,11 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
             </div>
           ))}
 
-          {loading && (
+          {(loading || voiceState === 'processing') && (
             <div className="flex items-end gap-2">
               <div
                 className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
-                style={{
-                  background: 'rgba(0,192,255,0.12)',
-                  boxShadow: '0 0 12px rgba(0,192,255,0.1)',
-                }}
+                style={{ background: 'rgba(0,192,255,0.12)', boxShadow: '0 0 12px rgba(0,192,255,0.1)' }}
               >
                 <Bot className="w-3.5 h-3.5 text-[#00C0FF]" />
               </div>
@@ -289,6 +409,14 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
           </div>
         )}
 
+        {/* Mic error */}
+        {micError && (
+          <div className="mx-4 mb-2 px-3 py-2 rounded-xl text-xs text-red-400 bg-red-500/10 border border-red-500/20 flex items-start gap-2">
+            <span className="shrink-0 mt-px">⚠</span>
+            <span>{micError}</span>
+          </div>
+        )}
+
         {/* Input area */}
         <div
           className="px-4 pb-4 pt-2 shrink-0 bg-[#0A0A0A]"
@@ -299,32 +427,84 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
             style={{ background: '#1A1A1A' }}
           >
             <input
-              ref={inputRef}
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Type a message..."
-              disabled={loading}
+              placeholder={
+                voiceState === 'listening' ? 'Listening…' :
+                voiceState === 'processing' ? 'Thinking…' :
+                'Type a message…'
+              }
+              disabled={isTextDisabled}
               className="flex-1 bg-transparent text-sm text-[#E0E0E0] placeholder-[#707070] focus:outline-none disabled:opacity-50"
             />
+
+            {/* Mic button — hold to record, tap to stop speaking */}
             <button
-              onClick={() => sendMessage(input)}
-              disabled={!input.trim() || loading}
-              className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors shrink-0 disabled:cursor-not-allowed ${
-                !input.trim() || loading
-                  ? 'bg-[#1A1A1A]'
-                  : 'bg-[#00C0FF] hover:bg-[#007BFF]'
+              onPointerDown={handleMicPointerDown}
+              onPointerUp={handleMicPointerUp}
+              onPointerCancel={handleMicPointerUp}
+              disabled={voiceState === 'processing' || loading}
+              aria-label={
+                voiceState === 'listening' ? 'Release to send' :
+                voiceState === 'speaking' ? 'Tap to stop audio' :
+                'Hold to record'
+              }
+              style={{ touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
+              className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all shrink-0 ${
+                voiceState === 'processing' || loading
+                  ? 'opacity-30 cursor-not-allowed'
+                  : voiceState === 'listening'
+                  ? 'mic-listening cursor-pointer bg-red-500/15'
+                  : voiceState === 'speaking'
+                  ? 'cursor-pointer'
+                  : 'cursor-pointer text-[#707070] hover:text-[#A0A0A0] hover:bg-white/5'
               }`}
             >
-              {loading ? (
+              {voiceState === 'listening' ? (
+                <Mic className="w-4 h-4 text-red-400" />
+              ) : voiceState === 'speaking' ? (
+                // Animated waveform bars
+                <div className="flex items-end gap-[2px] h-4 w-4 justify-center" style={{ paddingBottom: '1px' }}>
+                  <span className="bar1 block rounded-sm bg-[#00C0FF]" style={{ width: 3, height: 8, transformOrigin: 'bottom' }} />
+                  <span className="bar2 block rounded-sm bg-[#00C0FF]" style={{ width: 3, height: 12, transformOrigin: 'bottom' }} />
+                  <span className="bar3 block rounded-sm bg-[#00C0FF]" style={{ width: 3, height: 10, transformOrigin: 'bottom' }} />
+                  <span className="bar4 block rounded-sm bg-[#00C0FF]" style={{ width: 3, height: 6, transformOrigin: 'bottom' }} />
+                </div>
+              ) : voiceState === 'processing' ? (
                 <Loader2 className="w-4 h-4 animate-spin text-[#707070]" />
               ) : (
-                <Send className={`w-3.5 h-3.5 ${!input.trim() ? 'text-[#707070]' : 'text-[#0A0A0A]'}`} />
+                <Mic className="w-4 h-4" />
+              )}
+            </button>
+
+            {/* Send button */}
+            <button
+              onClick={() => sendTextMessage(input)}
+              disabled={!input.trim() || isTextDisabled}
+              className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors shrink-0 disabled:cursor-not-allowed ${
+                !input.trim() || isTextDisabled ? 'bg-transparent' : 'bg-[#00C0FF] hover:bg-[#007BFF]'
+              }`}
+            >
+              {loading && voiceState === 'idle' ? (
+                <Loader2 className="w-4 h-4 animate-spin text-[#707070]" />
+              ) : (
+                <Send className={`w-3.5 h-3.5 ${!input.trim() || isTextDisabled ? 'text-[#707070]' : 'text-[#0A0A0A]'}`} />
               )}
             </button>
           </div>
-          <p className="text-center text-[#707070] text-xs mt-2">Powered by Chodex</p>
+
+          {/* Status line */}
+          <p className="text-center text-xs mt-2 select-none">
+            {voiceState === 'listening' ? (
+              <span className="text-red-400">● Recording — release to send</span>
+            ) : voiceState === 'speaking' ? (
+              <span className="text-[#00C0FF]">Speaking — tap mic to stop</span>
+            ) : (
+              <span className="text-[#707070]">Powered by Chodex</span>
+            )}
+          </p>
         </div>
 
       </div>
