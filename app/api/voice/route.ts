@@ -11,11 +11,15 @@ export async function POST(request: NextRequest) {
   if (!diagnosticLogged) {
     diagnosticLogged = true;
     console.log('[voice] env check —',
-      'AZURE_OPENAI_ENDPOINT:', !!process.env.AZURE_OPENAI_ENDPOINT,
-      'AZURE_OPENAI_API_KEY:', !!process.env.AZURE_OPENAI_API_KEY,
-      'AZURE_OPENAI_WHISPER_DEPLOYMENT:', !!process.env.AZURE_OPENAI_WHISPER_DEPLOYMENT,
-      'AZURE_OPENAI_TTS_DEPLOYMENT:', !!process.env.AZURE_OPENAI_TTS_DEPLOYMENT,
-      'AZURE_OPENAI_DEPLOYMENT:', !!process.env.AZURE_OPENAI_DEPLOYMENT,
+      'ENDPOINT:', !!process.env.AZURE_OPENAI_ENDPOINT,
+      'API_KEY:', !!process.env.AZURE_OPENAI_API_KEY,
+      'DEPLOYMENT:', !!process.env.AZURE_OPENAI_DEPLOYMENT,
+      '| WHISPER_ENDPOINT:', !!process.env.AZURE_OPENAI_WHISPER_ENDPOINT,
+      'WHISPER_API_KEY:', !!process.env.AZURE_OPENAI_WHISPER_API_KEY,
+      'WHISPER_DEPLOYMENT:', !!process.env.AZURE_OPENAI_WHISPER_DEPLOYMENT,
+      '| TTS_ENDPOINT:', !!process.env.AZURE_OPENAI_TTS_ENDPOINT,
+      'TTS_API_KEY:', !!process.env.AZURE_OPENAI_TTS_API_KEY,
+      'TTS_DEPLOYMENT:', !!process.env.AZURE_OPENAI_TTS_DEPLOYMENT,
     );
   }
 
