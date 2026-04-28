@@ -18,18 +18,37 @@ interface ChatState {
 type VoiceState = 'idle' | 'listening' | 'processing' | 'speaking';
 
 function getSupportedMimeType(): string {
+  if (typeof MediaRecorder === 'undefined') return '';
+  // isTypeSupported may not exist on some early MediaRecorder implementations
+  if (typeof MediaRecorder.isTypeSupported !== 'function') return '';
   const candidates = [
     'audio/webm;codecs=opus',
     'audio/webm',
     'audio/ogg;codecs=opus',
-    'audio/mp4',
+    'audio/mp4',  // Safari / iOS — must be last so Chrome still picks webm
   ];
-  if (typeof MediaRecorder === 'undefined') return '';
   for (const t of candidates) {
     if (MediaRecorder.isTypeSupported(t)) return t;
   }
   return '';
 }
+
+const MIC_ERRORS: Record<string, string> = {
+  NotAllowedError:
+    'Microphone access was denied. Go to your browser settings, allow this site to use the microphone, then reload the page.',
+  PermissionDeniedError:
+    'Microphone access was denied. Go to your browser settings, allow this site to use the microphone, then reload the page.',
+  NotFoundError: 'No microphone found. Please connect a microphone and try again.',
+  NotReadableError:
+    'Microphone is in use by another app. Close other apps using the mic and try again.',
+  OverconstrainedError:
+    'Your device microphone does not meet the required audio settings. Please try again.',
+  AbortError: 'Recording was interrupted. Please try again.',
+  NotSupportedError:
+    'Audio recording is not supported in this browser. Please update to Safari 14.3+ or use Chrome.',
+  SecurityError:
+    'Microphone access is blocked by a security policy. This feature requires HTTPS.',
+};
 
 export default function ChatbotPage({ params }: { params: { orgSlug: string } }) {
   const { orgSlug } = params;
@@ -128,8 +147,10 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
     setVoiceState('processing');
     setMicError('');
     try {
+      // Use the correct extension so servers and Whisper identify the container
+      const ext = (audioBlob.type || '').includes('mp4') ? 'm4a' : 'webm';
       const form = new FormData();
-      form.append('audio', audioBlob, 'recording.webm');
+      form.append('audio', audioBlob, `recording.${ext}`);
       form.append('orgSlug', orgSlug);
       if (state.conversationId) form.append('conversationId', state.conversationId);
       if (state.visitorName) form.append('visitorName', state.visitorName);
@@ -160,47 +181,62 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
     }
   }
 
-  async function startRecording() {
-    setMicError('');
+  // Called once getUserMedia resolves — sets up and starts the MediaRecorder.
+  // Kept separate so getUserMedia can be called synchronously in the event handler.
+  function setupRecorder(stream: MediaStream) {
+    console.log('[voice] stream acquired, setting up recorder');
+    streamRef.current = stream;
+
+    const mimeType = getSupportedMimeType();
+    console.log('[voice] preferred mimeType:', mimeType || '(browser default)');
+
+    let recorder: MediaRecorder;
     try {
-      audioRef.current?.pause();
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000, channelCount: 1 },
-      });
-      streamRef.current = stream;
-
-      const mimeType = getSupportedMimeType();
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-      mediaRecorderRef.current = recorder;
-      audioChunksRef.current = [];
-      recordingStartRef.current = Date.now();
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
-      };
-
-      recorder.onstop = () => {
+      recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    } catch (err: any) {
+      // Construction with specific mimeType failed — try bare constructor
+      console.warn('[voice] MediaRecorder with mimeType failed, retrying without:', err.message);
+      try {
+        recorder = new MediaRecorder(stream);
+      } catch (err2: any) {
+        console.error('[voice] MediaRecorder construction failed entirely:', err2);
         stream.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
-        const duration = Date.now() - recordingStartRef.current;
-        if (duration < 300 || audioChunksRef.current.length === 0) {
-          setVoiceState('idle');
-          return;
-        }
-        const blob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
-        sendVoiceMessage(blob);
-      };
-
-      recorder.start(100);
-      setVoiceState('listening');
-    } catch (err: any) {
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setMicError('Microphone access needed. Click the lock icon in your browser address bar to enable it.');
-      } else {
-        setMicError(err.message || 'Could not access microphone.');
+        setMicError('Audio recording is not supported in this browser. Please update to Safari 14.3+ or use Chrome.');
+        setVoiceState('idle');
+        return;
       }
-      setVoiceState('idle');
     }
+
+    // Use what the recorder actually negotiated, not our guess
+    const actualMimeType = recorder.mimeType || mimeType || 'audio/mp4';
+    console.log('[voice] recorder.mimeType:', actualMimeType);
+
+    mediaRecorderRef.current = recorder;
+    audioChunksRef.current = [];
+    recordingStartRef.current = Date.now();
+
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) audioChunksRef.current.push(e.data);
+    };
+
+    recorder.onstop = () => {
+      stream.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      const duration = Date.now() - recordingStartRef.current;
+      console.log(`[voice] stopped — duration ${duration}ms, chunks ${audioChunksRef.current.length}`);
+      if (duration < 300 || audioChunksRef.current.length === 0) {
+        setVoiceState('idle');
+        return;
+      }
+      const blob = new Blob(audioChunksRef.current, { type: actualMimeType });
+      console.log(`[voice] blob: ${blob.size}B type:${blob.type}`);
+      sendVoiceMessage(blob);
+    };
+
+    recorder.start(100);
+    console.log('[voice] recording started');
+    setVoiceState('listening');
   }
 
   function stopRecording() {
@@ -211,14 +247,53 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
 
   function handleMicPointerDown(e: React.PointerEvent) {
     e.currentTarget.setPointerCapture(e.pointerId);
+
     if (voiceState === 'speaking') {
       audioRef.current?.pause();
       setVoiceState('idle');
       return;
     }
-    if (voiceState === 'idle') {
-      startRecording();
+    if (voiceState !== 'idle') return;
+
+    // iOS Safari PWA/home-screen mode blocks getUserMedia entirely
+    if (typeof window !== 'undefined' && (window.navigator as any).standalone === true) {
+      setMicError("Voice mode doesn't work when the site is added to the home screen. Open it in Safari directly.");
+      return;
     }
+
+    // Feature checks — give a clear error before touching getUserMedia
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMicError('Voice recording requires HTTPS and a modern browser (Chrome 49+ or Safari 14.3+).');
+      return;
+    }
+    if (typeof MediaRecorder === 'undefined') {
+      setMicError('Voice recording is not supported in this browser. Please update to Safari 14.3+ or use Chrome.');
+      return;
+    }
+
+    setMicError('');
+    audioRef.current?.pause();
+
+    // ⚠️ iOS Safari requires getUserMedia to be called synchronously inside a user gesture.
+    // Using .then() here (not async/await) keeps this call in the same synchronous task.
+    console.log('[voice] requesting microphone access...');
+    navigator.mediaDevices
+      .getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          channelCount: 1,
+          // Do NOT specify sampleRate — bare values like 16000 are treated as exact
+          // constraints on some Safari versions and cause NotAllowedError when the
+          // device can't satisfy them, even though mic permission was granted.
+        },
+      })
+      .then((stream) => setupRecorder(stream))
+      .catch((err: any) => {
+        console.error('[voice] getUserMedia error:', err.name, err.message, err);
+        setMicError(MIC_ERRORS[err.name] || err.message || 'Could not access microphone. Please try again.');
+        setVoiceState('idle');
+      });
   }
 
   function handleMicPointerUp() {
