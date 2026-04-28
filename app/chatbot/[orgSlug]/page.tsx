@@ -7,6 +7,7 @@ interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  warning?: string;
 }
 
 interface ChatState {
@@ -291,11 +292,17 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Voice processing failed');
 
-      const { transcript, response, conversationId, audioBase64 } = data;
+      const { transcript, response, conversationId, audioBase64, ttsError } = data;
+      const assistantMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: response,
+        warning: ttsError ? `Audio unavailable: ${ttsError}` : undefined,
+      };
       setMessages((prev) => [
         ...prev,
         { id: Date.now().toString(), role: 'user', content: transcript },
-        { id: (Date.now() + 1).toString(), role: 'assistant', content: response },
+        assistantMsg,
       ]);
       setState((prev) => ({ ...prev, conversationId }));
 
@@ -304,7 +311,12 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
       } else {
         setVoiceState('idle');
       }
-    } catch {
+    } catch (err: any) {
+      const errMsg = err?.message || 'Voice processing failed. Please try again.';
+      setMessages((prev) => [
+        ...prev,
+        { id: Date.now().toString(), role: 'assistant', content: errMsg, warning: undefined },
+      ]);
       setVoiceState('idle');
     }
   }
@@ -545,6 +557,11 @@ export default function ChatbotPage({ params }: { params: { orgSlug: string } })
                 }
               >
                 {msg.content}
+                {msg.warning && (
+                  <p className="mt-1.5 text-xs text-[#606060] leading-snug">
+                    {msg.warning}
+                  </p>
+                )}
               </div>
               {msg.role === 'user' && (
                 <div

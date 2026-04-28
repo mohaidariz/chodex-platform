@@ -4,7 +4,21 @@ import { runChatPipeline } from '@/lib/chat/pipeline';
 
 export const maxDuration = 60;
 
+let diagnosticLogged = false;
+
 export async function POST(request: NextRequest) {
+  // One-time env-presence log per container — never logs values
+  if (!diagnosticLogged) {
+    diagnosticLogged = true;
+    console.log('[voice] env check —',
+      'AZURE_OPENAI_ENDPOINT:', !!process.env.AZURE_OPENAI_ENDPOINT,
+      'AZURE_OPENAI_API_KEY:', !!process.env.AZURE_OPENAI_API_KEY,
+      'AZURE_OPENAI_WHISPER_DEPLOYMENT:', !!process.env.AZURE_OPENAI_WHISPER_DEPLOYMENT,
+      'AZURE_OPENAI_TTS_DEPLOYMENT:', !!process.env.AZURE_OPENAI_TTS_DEPLOYMENT,
+      'AZURE_OPENAI_DEPLOYMENT:', !!process.env.AZURE_OPENAI_DEPLOYMENT,
+    );
+  }
+
   try {
     const form = await request.formData();
     const audioBlob = form.get('audio') as Blob | null;
@@ -20,13 +34,27 @@ export async function POST(request: NextRequest) {
 
     // 1. Speech-to-text
     const audioBuffer = Buffer.from(await audioBlob.arrayBuffer());
-    const transcript = await transcribeAudio(audioBuffer, audioBlob.type || 'audio/webm');
-
-    if (!transcript) {
-      return NextResponse.json({ error: 'Could not transcribe audio — please speak clearly and try again.' }, { status: 422 });
+    let transcript: string;
+    try {
+      transcript = await transcribeAudio(audioBuffer, audioBlob.type || 'audio/webm');
+    } catch (err: any) {
+      console.error('[voice] STT error:', err.message);
+      return NextResponse.json(
+        { error: `Could not transcribe audio — ${err.message}` },
+        { status: 422 }
+      );
     }
 
-    // 2. Run chat pipeline with the transcript
+    if (!transcript) {
+      return NextResponse.json(
+        { error: 'Could not transcribe audio — please speak clearly and try again.' },
+        { status: 422 }
+      );
+    }
+
+    console.log('[voice] transcript:', transcript.slice(0, 80));
+
+    // 2. Chat pipeline
     const chatResult = await runChatPipeline({
       message: transcript,
       conversationId,
@@ -35,7 +63,7 @@ export async function POST(request: NextRequest) {
       visitorEmail,
     });
 
-    // 3. Text-to-speech (skip if caller is muted)
+    // 3. Text-to-speech
     let audioBase64: string | null = null;
     let ttsError: string | null = null;
     if (!noAudio) {
@@ -43,7 +71,7 @@ export async function POST(request: NextRequest) {
         const speechBuffer = await synthesizeSpeech(chatResult.response);
         audioBase64 = speechBuffer.toString('base64');
       } catch (err: any) {
-        console.error('TTS error:', err);
+        console.error('[voice] TTS error:', err.message);
         ttsError = err.message;
       }
     }
@@ -57,7 +85,7 @@ export async function POST(request: NextRequest) {
       sources: chatResult.sources,
     });
   } catch (error: any) {
-    console.error('Voice route error:', error);
+    console.error('[voice] unhandled error:', error.message);
     return NextResponse.json({ error: error.message || 'Voice processing failed' }, { status: 500 });
   }
 }

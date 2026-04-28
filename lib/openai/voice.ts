@@ -1,3 +1,18 @@
+async function parseAzureError(res: Response, label: string): Promise<never> {
+  let detail = `HTTP ${res.status}`;
+  try {
+    const body = await res.json();
+    const e = body?.error;
+    if (e) {
+      const parts = [e.code, e.message].filter(Boolean);
+      detail = `${res.status} ${parts.join(': ')}`;
+    }
+  } catch {
+    // non-JSON body — keep HTTP status only
+  }
+  throw new Error(`${label}: ${detail}`);
+}
+
 export async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Promise<string> {
   const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
   const apiKey = process.env.AZURE_OPENAI_API_KEY;
@@ -5,7 +20,6 @@ export async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Pr
 
   if (!endpoint || !apiKey) throw new Error('AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY must be set');
 
-  // Map mime type to a file extension Whisper accepts
   let ext = 'webm';
   if (mimeType.includes('mp4') || mimeType.includes('m4a')) ext = 'mp4';
   else if (mimeType.includes('wav')) ext = 'wav';
@@ -24,10 +38,7 @@ export async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Pr
     }
   );
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Whisper transcription failed: ${res.status} — ${err}`);
-  }
+  if (!res.ok) await parseAzureError(res, `Whisper (${deployment})`);
 
   const data = await res.json();
   return (data.text || '').trim();
@@ -49,10 +60,7 @@ export async function synthesizeSpeech(text: string): Promise<Buffer> {
     }
   );
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`TTS synthesis failed: ${res.status} — ${err}`);
-  }
+  if (!res.ok) await parseAzureError(res, `TTS (${deployment})`);
 
   const arrayBuffer = await res.arrayBuffer();
   return Buffer.from(arrayBuffer);
