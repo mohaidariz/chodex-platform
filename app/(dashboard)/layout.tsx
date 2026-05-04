@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { LayoutDashboard, FileText, MessageSquare, Code2, Settings, CalendarDays } from 'lucide-react';
+import { LayoutDashboard, FileText, MessageSquare, Code2, Settings, CalendarDays, ShieldCheck } from 'lucide-react';
 import { SignOutButton } from './components/SignOutButton';
 
 const navItems = [
@@ -29,6 +29,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .single();
 
   const orgName = (profile as any)?.organizations?.name || 'Your Organization';
+  const isSuperAdmin = (profile as any)?.is_super_admin === true;
 
   return (
     <div className="flex h-screen bg-gray-950 text-white overflow-hidden">
@@ -52,6 +53,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
               </Link>
             );
           })}
+
+          {isSuperAdmin && (
+            <>
+              <div className="my-2 mx-3 border-t border-gray-800" />
+              <Link
+                href="/admin"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-amber-500/80 hover:text-amber-400 hover:bg-amber-400/10 transition-colors group"
+              >
+                <ShieldCheck className="w-4 h-4 group-hover:text-amber-400 transition-colors" />
+                <span className="text-sm font-medium">Admin</span>
+              </Link>
+            </>
+          )}
         </nav>
 
         <div className="px-3 py-4 border-t border-gray-800">
