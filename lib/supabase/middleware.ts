@@ -32,8 +32,7 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith('/chatbot') &&
     !request.nextUrl.pathname.startsWith('/api/chat') &&
     !request.nextUrl.pathname.startsWith('/book') &&
-    !request.nextUrl.pathname.startsWith('/api/bookings') &&
-    !request.nextUrl.pathname.startsWith('/api/voice')
+    !request.nextUrl.pathname.startsWith('/api/bookings')
   ) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
