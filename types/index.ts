@@ -97,6 +97,20 @@ export interface Booking {
   created_at: string;
 }
 
+export interface FieldMap {
+  id: string;
+  org_id: string;
+  name: string;
+  project_code: string | null;
+  map_type: 'byggkarta' | 'borrkarta' | 'other';
+  original_pdf_storage_key: string;
+  page_count: number | null;
+  status: 'uploading' | 'extracting' | 'ready' | 'failed';
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface EmailLog {
   id: string;
   org_id: string;
