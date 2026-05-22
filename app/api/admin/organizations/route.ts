@@ -47,8 +47,6 @@ export async function POST(request: NextRequest) {
       name: name.trim(),
       slug,
       settings: {
-        timezone: 'Europe/Stockholm',
-        slot_duration_minutes: 30,
         notification_email: notificationEmail || user.email,
         status: 'active',
       },

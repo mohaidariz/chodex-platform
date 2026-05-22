@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverComponentsExternalPackages: ['pdf-parse', 'pdfjs-dist', 'pdf-to-img', '@napi-rs/canvas'],
+    serverComponentsExternalPackages: ['pdf-to-img', '@napi-rs/canvas', 'pdfjs-dist'],
   },
   webpack: (config) => {
     config.resolve.alias.canvas = false;

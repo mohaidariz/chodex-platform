@@ -15,88 +15,6 @@ export interface Profile {
   created_at: string;
 }
 
-export interface Document {
-  id: string;
-  org_id: string;
-  name: string;
-  file_path: string;
-  file_type: string;
-  status: 'pending' | 'processing' | 'processed' | 'error';
-  chunk_count: number;
-  created_at: string;
-}
-
-export interface DocumentChunk {
-  id: string;
-  document_id: string;
-  org_id: string;
-  content: string;
-  embedding: number[];
-  metadata: Record<string, any>;
-  created_at: string;
-}
-
-export interface Conversation {
-  id: string;
-  org_id: string;
-  visitor_name?: string;
-  visitor_email?: string;
-  status: 'active' | 'resolved' | 'escalated';
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Message {
-  id: string;
-  conversation_id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  metadata?: Record<string, any>;
-  created_at: string;
-}
-
-export interface Learning {
-  id: string;
-  org_id: string;
-  conversation_id: string;
-  question: string;
-  answer: string;
-  helpful: boolean;
-  created_at: string;
-}
-
-export interface AvailabilityRule {
-  id: string;
-  org_id: string;
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface AvailabilityBlackout {
-  id: string;
-  org_id: string;
-  start_at: string;
-  end_at: string;
-  reason?: string;
-  created_at: string;
-}
-
-export interface Booking {
-  id: string;
-  org_id: string;
-  booking_code: string;
-  visitor_name: string;
-  visitor_email: string;
-  description: string;
-  start_at: string;
-  end_at: string;
-  status: 'confirmed' | 'cancelled';
-  created_at: string;
-}
-
 export interface FieldMap {
   id: string;
   org_id: string;
@@ -109,17 +27,4 @@ export interface FieldMap {
   error_message: string | null;
   created_at: string;
   updated_at: string;
-}
-
-export interface EmailLog {
-  id: string;
-  org_id: string;
-  conversation_id?: string;
-  to_email: string;
-  from_name: string;
-  from_email: string;
-  subject: string;
-  body: string;
-  status: 'sent' | 'failed';
-  created_at: string;
 }
