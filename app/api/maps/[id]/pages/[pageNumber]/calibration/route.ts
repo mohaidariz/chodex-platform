@@ -61,7 +61,7 @@ export async function POST(
 
     // Helper: turn an input anchor (pixel + either {n,e} or {lat,lng}) into
     // a CalibrationAnchor in SWEREF coordinates.
-    function buildAnchor(input: any, label: string): CalibrationAnchor {
+    const buildAnchor = (input: any, label: string): CalibrationAnchor => {
       if (
         typeof input?.pixel_x !== 'number' ||
         typeof input?.pixel_y !== 'number'
@@ -84,7 +84,7 @@ export async function POST(
         throw new Error(`${label}: provide either { n, e } or { lat, lng }`);
       }
       return { pixel_x: input.pixel_x, pixel_y: input.pixel_y, n, e };
-    }
+    };
 
     // Two formats supported:
     //   v2 two-anchor: body.anchors = [a, b]
