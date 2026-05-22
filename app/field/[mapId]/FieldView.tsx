@@ -392,6 +392,8 @@ function ChatPanel({
 }: ChatPanelProps) {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // endRef is a ref; including it in deps is unnecessary
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chat.length, loading]);
 
   async function send() {
@@ -430,10 +432,10 @@ function ChatPanel({
           <div className="text-sm text-gray-500 text-center py-4">
             Ask anything about what is near you. Examples:
             <ul className="mt-3 space-y-1.5 text-xs text-gray-400">
-              <li>"What cables are around me?"</li>
-              <li>"What should I dig here?"</li>
-              <li>"Vad finns inom 50 meter?"</li>
-              <li>"Vilken kabel ska läggas på den här sträckan?"</li>
+              <li>&ldquo;What cables are around me?&rdquo;</li>
+              <li>&ldquo;What should I dig here?&rdquo;</li>
+              <li>&ldquo;Vad finns inom 50 meter?&rdquo;</li>
+              <li>&ldquo;Vilken kabel ska läggas på den här sträckan?&rdquo;</li>
             </ul>
           </div>
         )}

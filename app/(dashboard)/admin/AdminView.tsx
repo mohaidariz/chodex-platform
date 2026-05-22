@@ -188,7 +188,7 @@ export default function AdminView({ initialOrgs, stats, userEmail }: Props) {
       {orgs.length === 0 ? (
         <div className="text-center py-20 text-gray-600">
           <p className="text-lg">No organizations yet.</p>
-          <p className="text-sm mt-1">Click "New organization" to add the first one.</p>
+          <p className="text-sm mt-1">Click &ldquo;New organization&rdquo; to add the first one.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
