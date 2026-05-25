@@ -120,15 +120,37 @@ export default function FieldView({ map, pages, features }: Props) {
       setGpsStarting(false);
       return;
     }
+
+    // Skip the initial coarse network/cell-tower fix and only accept readings
+    // once the device has a real GPS lock. Loosen the threshold gradually if
+    // it's taking a long time so we don't end up stuck with no dot at all.
+    let acceptedAtLeastOne = false;
+    let acceptanceThreshold = 30; // meters, tightens as GPS warms up
+    const startedAt = Date.now();
+
     const id = navigator.geolocation.watchPosition(
       (pos) => {
+        const acc = pos.coords.accuracy;
+        const elapsed = Date.now() - startedAt;
+
+        // After 8 seconds, accept any reading better than 100m so the user
+        // gets SOME position fix even if GPS struggles indoors.
+        if (elapsed > 8000) acceptanceThreshold = Math.max(acceptanceThreshold, 100);
+        if (elapsed > 20000) acceptanceThreshold = Math.max(acceptanceThreshold, 250);
+
+        if (!acceptedAtLeastOne && acc > acceptanceThreshold) {
+          // Still waiting for a tighter fix; keep "locking GPS" visible.
+          return;
+        }
+
         setPosition({
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
+          accuracy: acc,
         });
         setGpsError('');
         setGpsStarting(false);
+        acceptedAtLeastOne = true;
       },
       (err) => {
         setGpsError(err.message);
@@ -136,8 +158,8 @@ export default function FieldView({ map, pages, features }: Props) {
       },
       {
         enableHighAccuracy: true,
-        maximumAge: 5000,
-        timeout: 20000,
+        maximumAge: 0,
+        timeout: 30000,
       },
     );
     watchIdRef.current = id;
