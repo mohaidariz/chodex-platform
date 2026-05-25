@@ -83,8 +83,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </aside>
 
       <main className="flex-1 overflow-auto flex flex-col">
-        {/* Reserve space on mobile for the top bar */}
-        <div className="md:hidden h-12 shrink-0" />
+        {/* Reserve space on mobile for the top bar (matches the bar's
+            height which includes the iPhone safe-area inset). */}
+        <div
+          className="md:hidden shrink-0"
+          style={{ height: 'calc(3rem + env(safe-area-inset-top, 0px))' }}
+        />
         <div className="flex-1 overflow-auto">{children}</div>
       </main>
     </div>

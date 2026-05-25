@@ -37,14 +37,22 @@ export function MobileTopBar({
 
   return (
     <>
-      {/* Mobile top bar — fixed to the top of the viewport, only below md */}
-      <div className="md:hidden fixed top-0 left-0 right-0 h-12 px-4 border-b border-gray-800 bg-black flex items-center justify-between z-30">
+      {/* Mobile top bar — fixed to the top of the viewport, only below md.
+          Adds the iPhone safe-area inset so it doesn't sit under the
+          notch / Dynamic Island. */}
+      <div
+        className="md:hidden fixed top-0 left-0 right-0 px-4 border-b border-gray-800 bg-black flex items-center justify-between z-30"
+        style={{
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          height: 'calc(3rem + env(safe-area-inset-top, 0px))',
+        }}
+      >
         <button
           onClick={() => setOpen(true)}
           className="p-2 -ml-2 text-gray-300 hover:text-white"
           aria-label="Open menu"
         >
-          <Menu className="w-5 h-5" />
+          <Menu className="w-6 h-6" />
         </button>
         <h1 className="text-sm font-bold text-white">Norrplex</h1>
         <div className="w-9" />
