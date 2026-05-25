@@ -6,7 +6,7 @@ import { SignOutButton } from './components/SignOutButton';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/maps', label: 'Field maps', icon: MapIcon },
+  { href: '/maps', label: 'Projects', icon: MapIcon },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -29,8 +29,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const isSuperAdmin = (profile as any)?.is_super_admin === true;
 
   return (
-    <div className="flex h-screen bg-gray-950 text-white overflow-hidden">
-      <aside className="w-64 flex flex-col bg-gray-900 border-r border-gray-800 shrink-0">
+    <div className="flex h-screen bg-black text-white overflow-hidden">
+      <aside className="w-64 flex flex-col bg-black border-r border-gray-800 shrink-0">
         <div className="px-6 py-5 border-b border-gray-800">
           <h1 className="text-xl font-bold text-white">Norrplex</h1>
           <p className="text-xs text-gray-400 mt-0.5 truncate">{orgName}</p>

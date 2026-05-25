@@ -25,6 +25,7 @@ export interface FieldMap {
   page_count: number | null;
   status: 'uploading' | 'extracting' | 'ready' | 'failed';
   error_message: string | null;
+  pinned_at: string | null;
   created_at: string;
   updated_at: string;
 }

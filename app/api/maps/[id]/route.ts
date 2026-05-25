@@ -68,6 +68,93 @@ export async function GET(
 }
 
 /**
+ * PATCH /api/maps/[id]
+ *
+ * Update project metadata. Currently used to toggle `pinned_at` (pin /
+ * unpin a project in the dashboard list). Accepts:
+ *   { pinned: true | false }  — convenience flag, server picks now() / null
+ *   { pinned_at: ISO string | null }  — explicit
+ *   { name: string }
+ *   { project_code: string }
+ *   { map_type: 'byggkarta' | 'borrkarta' | 'other' }
+ */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  try {
+    const supabase = await createServerSupabaseClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const service = createServiceRoleClient();
+    const { data: profile } = await service
+      .from('profiles')
+      .select('org_id')
+      .eq('id', user.id)
+      .single();
+    if (!profile?.org_id) {
+      return NextResponse.json({ error: 'No organization' }, { status: 400 });
+    }
+
+    const { data: map } = await service
+      .from('maps')
+      .select('org_id')
+      .eq('id', params.id)
+      .single();
+    if (!map) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (map.org_id !== profile.org_id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const body = await req.json();
+    const patch: Record<string, any> = {};
+
+    if (typeof body.pinned === 'boolean') {
+      patch.pinned_at = body.pinned ? new Date().toISOString() : null;
+    } else if ('pinned_at' in body) {
+      patch.pinned_at = body.pinned_at;
+    }
+    if (typeof body.name === 'string' && body.name.trim()) {
+      patch.name = body.name.trim();
+    }
+    if ('project_code' in body) {
+      patch.project_code = body.project_code?.trim() || null;
+    }
+    if (
+      typeof body.map_type === 'string' &&
+      ['byggkarta', 'borrkarta', 'other'].includes(body.map_type)
+    ) {
+      patch.map_type = body.map_type;
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return NextResponse.json({ error: 'No updatable fields' }, { status: 400 });
+    }
+
+    const { data: updated, error } = await service
+      .from('maps')
+      .update(patch)
+      .eq('id', params.id)
+      .select()
+      .single();
+    if (error) throw error;
+
+    return NextResponse.json(updated);
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error?.message || 'Update failed' },
+      { status: 500 },
+    );
+  }
+}
+
+/**
  * DELETE /api/maps/[id]
  *
  * Removes a map and (via cascade) its pages and features.

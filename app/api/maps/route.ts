@@ -5,16 +5,19 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 
 /**
  * POST /api/maps
- * Upload a Byggkarta or Borrkarta PDF.
  *
- * Multipart form fields:
- *   - file: the PDF (required)
- *   - name: display name for the map (optional, defaults to file name)
- *   - project_code: e.g. "IB350077" (optional)
- *   - map_type: "byggkarta" | "borrkarta" | "other" (defaults to "byggkarta")
+ * Two modes:
  *
- * Returns the created map row. Status starts at "uploading"; the next
- * pipeline step (extraction) will flip it to "extracting" and then "ready".
+ * 1. JSON mode (manual project creation, no PDF):
+ *    Content-Type: application/json
+ *    Body: { name: string, project_code?: string, map_type?: 'byggkarta'|'borrkarta'|'other' }
+ *    Returns the created map row with status 'ready' (it's empty but usable).
+ *
+ * 2. Multipart mode (legacy: upload a PDF and run extraction):
+ *    Content-Type: multipart/form-data
+ *    Fields: file (PDF, required), name, project_code, map_type
+ *    Returns the created map row with status 'extracting'. The dashboard
+ *    triggers extraction via /api/maps/[id]/extract after this.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -38,6 +41,46 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No organization' }, { status: 400 });
     }
 
+    const contentType = request.headers.get('content-type') || '';
+
+    // ---------- JSON mode: manual project creation ----------
+    if (contentType.includes('application/json')) {
+      const body = await request.json();
+      const name = (body?.name as string)?.trim();
+      const projectCode = (body?.project_code as string)?.trim() || null;
+      const mapTypeRaw = (body?.map_type as string) || 'byggkarta';
+      const mapType = ['byggkarta', 'borrkarta', 'other'].includes(mapTypeRaw)
+        ? mapTypeRaw
+        : 'byggkarta';
+
+      if (!name) {
+        return NextResponse.json(
+          { error: 'name is required' },
+          { status: 400 },
+        );
+      }
+
+      const { data: createdMap, error: insertError } = await serviceClient
+        .from('maps')
+        .insert({
+          org_id: profile.org_id,
+          name,
+          project_code: projectCode,
+          map_type: mapType,
+          // Sentinel value so the column's NOT NULL constraint is satisfied
+          // while indicating no PDF was uploaded.
+          original_pdf_storage_key: 'manual',
+          status: 'ready',
+        })
+        .select()
+        .single();
+      if (insertError || !createdMap) {
+        throw insertError ?? new Error('Insert failed');
+      }
+      return NextResponse.json(createdMap);
+    }
+
+    // ---------- Multipart mode: PDF upload + extraction ----------
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     if (!file) {
@@ -57,8 +100,6 @@ export async function POST(request: NextRequest) {
       ? mapTypeRaw
       : 'byggkarta';
 
-    // 1. Create the maps row first so we have an id for the storage path.
-    //    We set a placeholder storage key and patch it after the upload succeeds.
     const { data: createdMap, error: insertError } = await serviceClient
       .from('maps')
       .insert({
@@ -73,7 +114,6 @@ export async function POST(request: NextRequest) {
       .single();
     if (insertError || !createdMap) throw insertError ?? new Error('Insert failed');
 
-    // 2. Upload the PDF to storage at {org_id}/{map_id}/original.pdf
     const storageKey = `${profile.org_id}/${createdMap.id}/original.pdf`;
     const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -85,13 +125,10 @@ export async function POST(request: NextRequest) {
       });
 
     if (uploadError) {
-      // Clean up the row we just inserted so we don't leave orphans
       await serviceClient.from('maps').delete().eq('id', createdMap.id);
       throw uploadError;
     }
 
-    // 3. Patch the map row with the real storage key and move to "extracting".
-    //    Extraction itself will be wired in the next step of the build.
     const { data: updated, error: updateError } = await serviceClient
       .from('maps')
       .update({
@@ -143,6 +180,9 @@ export async function GET(_request: NextRequest) {
       .from('maps')
       .select('*')
       .eq('org_id', profile.org_id)
+      // Pinned projects first (most-recently pinned at the very top),
+      // then everything else by created_at desc.
+      .order('pinned_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
 
     return NextResponse.json(maps || []);

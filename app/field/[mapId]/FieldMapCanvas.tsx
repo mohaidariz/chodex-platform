@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   MapContainer,
   TileLayer,
   ImageOverlay,
   Marker,
+  Polyline,
   Circle,
   useMap,
 } from 'react-leaflet';
@@ -20,69 +21,162 @@ interface MapPageRow {
   corner_se_lat: number | null; corner_se_lng: number | null;
 }
 
+interface MapFeature {
+  id: string;
+  feature_type: string;
+  lat: number;
+  lng: number;
+  end_lat: number | null;
+  end_lng: number | null;
+  source_id: string | null;
+  label: string | null;
+  props: Record<string, any>;
+}
+
 interface Props {
   pages: MapPageRow[];
   pageImageUrls: Record<number, string>;
+  features: MapFeature[];
   position: { lat: number; lng: number; accuracy: number } | null;
   radiusM: number;
+  overlayOpacity: number;
+  followMe: boolean;
+  onPanned?: () => void;
 }
 
-// Blue dot for the user's position (Google-Maps style)
+const FEATURE_COLORS: Record<string, string> = {
+  cable: '#60a5fa',
+  drill_segment: '#dc2626',
+  drill_pit: '#ef4444',
+  dig_area: '#fb923c',
+  joint: '#a78bfa',
+  pole: '#fbbf24',
+  cabinet: '#10b981',
+  transformer: '#ec4899',
+  annotation: '#94a3b8',
+  route: '#0a0a0a',
+  other: '#9ca3af',
+};
+
 const POSITION_ICON = L.divIcon({
   className: '',
-  iconSize: [22, 22],
-  iconAnchor: [11, 11],
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
   html: `<div style="
-    width:22px; height:22px; border-radius:50%;
-    background:#3b82f6; border:3px solid #fff;
-    box-shadow:0 0 0 2px rgba(59,130,246,0.4), 0 2px 6px rgba(0,0,0,0.4);
+    width:28px; height:28px; border-radius:50%;
+    background:#3b82f6; border:4px solid #fff;
+    box-shadow:0 0 0 2px rgba(59,130,246,0.4), 0 2px 8px rgba(0,0,0,0.4);
   "></div>`,
 });
 
-function CenterOnPosition({
+function makeMarkerIcon(color: string, size: number): L.DivIcon {
+  return L.divIcon({
+    className: '',
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    html: `<div style="
+      width:${size}px; height:${size}px; border-radius:50%;
+      background:${color}; border:3px solid #fff;
+      box-shadow:0 0 0 1.5px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.4);
+    "></div>`,
+  });
+}
+
+function ViewController({
   position,
   pages,
+  features,
+  followMe,
+  onPanned,
 }: {
   position: { lat: number; lng: number } | null;
   pages: MapPageRow[];
+  features: MapFeature[];
+  followMe: boolean;
+  onPanned?: () => void;
 }) {
   const map = useMap();
-  // First load: fit to all pages or to position
+  const initialFitDone = useRef(false);
+
   useEffect(() => {
+    if (initialFitDone.current) return;
     if (position) {
       map.setView([position.lat, position.lng], 18, { animate: true });
-    } else {
-      // Fit to all pages with corners
-      const lats: number[] = [];
-      const lngs: number[] = [];
-      for (const p of pages) {
-        for (const [lat, lng] of [
-          [p.corner_nw_lat, p.corner_nw_lng],
-          [p.corner_ne_lat, p.corner_ne_lng],
-          [p.corner_sw_lat, p.corner_sw_lng],
-          [p.corner_se_lat, p.corner_se_lng],
-        ]) {
-          if (lat != null && lng != null) {
-            lats.push(lat);
-            lngs.push(lng);
-          }
+      initialFitDone.current = true;
+      return;
+    }
+
+    const lats: number[] = [];
+    const lngs: number[] = [];
+    for (const p of pages) {
+      for (const [lat, lng] of [
+        [p.corner_nw_lat, p.corner_nw_lng],
+        [p.corner_ne_lat, p.corner_ne_lng],
+        [p.corner_sw_lat, p.corner_sw_lng],
+        [p.corner_se_lat, p.corner_se_lng],
+      ]) {
+        if (lat != null && lng != null) {
+          lats.push(lat);
+          lngs.push(lng);
         }
       }
-      if (lats.length > 0) {
-        const bounds: LatLngBoundsExpression = [
-          [Math.min(...lats), Math.min(...lngs)],
-          [Math.max(...lats), Math.max(...lngs)],
-        ];
-        map.fitBounds(bounds, { padding: [40, 40] });
+    }
+    for (const f of features) {
+      lats.push(f.lat);
+      lngs.push(f.lng);
+      if (f.end_lat != null && f.end_lng != null) {
+        lats.push(f.end_lat);
+        lngs.push(f.end_lng);
+      }
+      const path = Array.isArray(f.props?.path) ? f.props.path : null;
+      if (path) {
+        for (const v of path) {
+          lats.push(v.lat);
+          lngs.push(v.lng);
+        }
       }
     }
-    // Re-run only when position appears for the first time
+    if (lats.length > 0) {
+      const bounds: LatLngBoundsExpression = [
+        [Math.min(...lats), Math.min(...lngs)],
+        [Math.max(...lats), Math.max(...lngs)],
+      ];
+      map.fitBounds(bounds, { padding: [40, 40] });
+      initialFitDone.current = true;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!position]);
+  }, [position, pages, features]);
+
+  useEffect(() => {
+    if (followMe && position) {
+      map.setView([position.lat, position.lng], map.getZoom() || 18, { animate: true });
+    }
+  }, [followMe, position, map]);
+
+  useEffect(() => {
+    if (!onPanned) return;
+    const handler = (e: any) => {
+      if (e?.originalEvent) onPanned();
+    };
+    map.on('dragstart', handler);
+    return () => {
+      map.off('dragstart', handler);
+    };
+  }, [map, onPanned]);
+
   return null;
 }
 
-export default function FieldMapCanvas({ pages, pageImageUrls, position, radiusM }: Props) {
+export default function FieldMapCanvas({
+  pages,
+  pageImageUrls,
+  features,
+  position,
+  radiusM,
+  overlayOpacity,
+  followMe,
+  onPanned,
+}: Props) {
   const pagesWithCorners = useMemo(
     () => pages.filter((p) => p.corner_nw_lat != null),
     [pages],
@@ -96,16 +190,26 @@ export default function FieldMapCanvas({ pages, pageImageUrls, position, radiusM
     <MapContainer
       center={center}
       zoom={position ? 18 : 9}
+      maxZoom={22}
       style={{ height: '100%', width: '100%' }}
       zoomControl={true}
+      preferCanvas={true}
     >
-      <CenterOnPosition position={position} pages={pages} />
+      <ViewController
+        position={position}
+        pages={pages}
+        features={features}
+        followMe={followMe}
+        onPanned={onPanned}
+      />
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        maxZoom={22}
+        maxNativeZoom={19}
       />
 
-      {/* PDF overlays for each calibrated page */}
+      {/* PDF overlays */}
       {pagesWithCorners.map((p) => {
         const url = pageImageUrls[p.page_number];
         if (!url) return null;
@@ -118,7 +222,53 @@ export default function FieldMapCanvas({ pages, pageImageUrls, position, radiusM
             key={`overlay-${p.page_number}`}
             url={url}
             bounds={[[south, west], [north, east]]}
-            opacity={0.85}
+            opacity={overlayOpacity}
+          />
+        );
+      })}
+
+      {/* Features placed by the designer */}
+      {features.map((f) => {
+        const color = FEATURE_COLORS[f.feature_type] ?? FEATURE_COLORS.other;
+        const path = Array.isArray(f.props?.path) ? (f.props.path as { lat: number; lng: number }[]) : null;
+        if (path && path.length >= 2) {
+          return (
+            <Polyline
+              key={f.id}
+              positions={path.map((p) => [p.lat, p.lng])}
+              pathOptions={{
+                color,
+                weight: 5,
+                opacity: 0.95,
+                lineCap: 'round',
+                lineJoin: 'round',
+              }}
+            />
+          );
+        }
+        if (f.end_lat != null && f.end_lng != null) {
+          return (
+            <Polyline
+              key={f.id}
+              positions={[
+                [f.lat, f.lng],
+                [f.end_lat, f.end_lng],
+              ]}
+              pathOptions={{
+                color,
+                weight: 5,
+                opacity: 0.95,
+                lineCap: 'round',
+                lineJoin: 'round',
+              }}
+            />
+          );
+        }
+        return (
+          <Marker
+            key={f.id}
+            position={[f.lat, f.lng]}
+            icon={makeMarkerIcon(color, 18)}
           />
         );
       })}

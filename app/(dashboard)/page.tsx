@@ -48,10 +48,10 @@ export default async function DashboardPage() {
   }
 
   const statCards = [
-    { label: 'Maps uploaded', value: stats.maps, icon: MapIcon },
-    { label: 'Ready maps', value: stats.ready, icon: CheckCircle },
+    { label: 'Projects', value: stats.maps, icon: MapIcon },
+    { label: 'Ready projects', value: stats.ready, icon: CheckCircle },
     { label: 'Calibrated pages', value: stats.calibratedPages, icon: Crosshair },
-    { label: 'Extracted features', value: stats.features, icon: FileText },
+    { label: 'Features placed', value: stats.features, icon: FileText },
   ];
 
   return (
@@ -89,13 +89,12 @@ export default async function DashboardPage() {
         <h3 className="text-lg font-semibold text-white mb-2">Getting started</h3>
         <ol className="space-y-3 text-gray-400 text-sm list-decimal list-inside">
           <li>
-            Go to <Link href="/maps" className="text-indigo-400 hover:text-indigo-300">Field maps</Link>{' '}
-            and upload a Byggkarta or Borrkarta PDF.
+            Go to <Link href="/maps" className="text-indigo-400 hover:text-indigo-300">Projects</Link>{' '}
+            and create a new project with an ID and name.
           </li>
-          <li>Wait for status to flip from <em>extracting</em> to <em>ready</em>.</li>
-          <li>Open the map, click <em>Calibrate</em>, anchor each detail page to OpenStreetMap.</li>
-          <li>Click <em>Open field view</em> to hand it to the crew on iPad. Their GPS position
-            shows on the map and the agent answers questions about what is nearby.</li>
+          <li>The editor opens on a real-world map. Pick a tool from the left toolbar — point or line — and click on the map to start placing features.</li>
+          <li>Select any feature to edit its label, source ID, cable type, depth, and status in the right panel.</li>
+          <li>When the project is ready, click <em>Open field view</em> to hand it to the crew on iPad. Their GPS position shows on the map and the agent answers questions about what is nearby.</li>
         </ol>
       </div>
     </div>

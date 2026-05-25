@@ -17,6 +17,8 @@ import {
   MessageSquare,
   Send,
   List,
+  Navigation,
+  Layers,
 } from 'lucide-react';
 import type { FieldMap } from '@/types';
 
@@ -106,6 +108,11 @@ export default function FieldView({ map, pages, features }: Props) {
   const [chatError, setChatError] = useState<string>('');
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
+  // Map layer controls
+  const [overlayOpacity, setOverlayOpacity] = useState<number>(0.85);
+  const [showOpacityPanel, setShowOpacityPanel] = useState<boolean>(false);
+  const [followMe, setFollowMe] = useState<boolean>(true);
+
   // Start GPS watch
   useEffect(() => {
     if (!('geolocation' in navigator)) {
@@ -164,12 +171,50 @@ export default function FieldView({ map, pages, features }: Props) {
     };
   }, [map.id, pages]);
 
+  // Detect if the user's position is within any calibrated page's bounds
+  const inProjectArea = useMemo(() => {
+    if (!position) return null; // unknown
+    for (const p of pages) {
+      if (p.corner_nw_lat == null) continue;
+      const south = Math.min(p.corner_sw_lat!, p.corner_se_lat!);
+      const north = Math.max(p.corner_nw_lat!, p.corner_ne_lat!);
+      const west = Math.min(p.corner_nw_lng!, p.corner_sw_lng!);
+      const east = Math.max(p.corner_ne_lng!, p.corner_se_lng!);
+      if (
+        position.lat >= south &&
+        position.lat <= north &&
+        position.lng >= west &&
+        position.lng <= east
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }, [position, pages]);
+
   // Compute nearby features
   const nearby = useMemo(() => {
     if (!position) return [];
     const withDistance = features.map((f) => {
       let d: number;
-      if (f.end_lat != null && f.end_lng != null) {
+      const pathVerts = Array.isArray((f.props as any)?.path)
+        ? ((f.props as any).path as { lat: number; lng: number }[])
+        : null;
+      if (pathVerts && pathVerts.length >= 2) {
+        // Multi-vertex path: distance is the minimum across all segments
+        let min = Infinity;
+        for (let i = 0; i < pathVerts.length - 1; i++) {
+          const a = pathVerts[i];
+          const b = pathVerts[i + 1];
+          const dist = pointToSegmentMeters(
+            position.lat, position.lng,
+            a.lat, a.lng,
+            b.lat, b.lng,
+          );
+          if (dist < min) min = dist;
+        }
+        d = min;
+      } else if (f.end_lat != null && f.end_lng != null) {
         d = pointToSegmentMeters(
           position.lat, position.lng,
           f.lat, f.lng,
@@ -211,8 +256,12 @@ export default function FieldView({ map, pages, features }: Props) {
         <FieldMapCanvas
           pages={pages}
           pageImageUrls={pageImageUrls}
+          features={features}
           position={position}
           radiusM={radiusM}
+          overlayOpacity={overlayOpacity}
+          followMe={followMe}
+          onPanned={() => setFollowMe(false)}
         />
       </div>
 
