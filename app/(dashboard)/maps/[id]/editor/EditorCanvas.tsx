@@ -63,7 +63,7 @@ function CursorOverride({ tool }: { tool: ToolState['tool'] }) {
   const map = useMap();
   useEffect(() => {
     const el = map.getContainer();
-    if (tool === 'point' || tool === 'line') el.style.cursor = 'crosshair';
+    if (tool === 'feature' || tool === 'route' || tool === 'section') el.style.cursor = 'crosshair';
     else if (tool === 'delete') el.style.cursor = 'not-allowed';
     else el.style.cursor = '';
     return () => {
