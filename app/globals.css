@@ -38,6 +38,31 @@ html, body {
   animation: hover-jump 0.32s ease-out;
 }
 
+/* Smooth the user GPS marker so it slides between position updates instead
+   of jumping. Scoped to the gps-position-marker class so it doesn't affect
+   other Leaflet markers (which would lag during pan/zoom). */
+.leaflet-marker-icon.gps-position-marker {
+  transition: transform 0.6s linear;
+}
+
+/* Subtle pulsing ring around the user position so it reads as "live GPS" */
+@keyframes gps-pulse {
+  0%   { opacity: 0.5; transform: scale(0.9); }
+  50%  { opacity: 0.2; transform: scale(1.4); }
+  100% { opacity: 0;   transform: scale(1.8); }
+}
+.leaflet-marker-icon.gps-position-marker > div::after {
+  content: '';
+  position: absolute;
+  top: -4px; left: -4px;
+  width: calc(100% + 8px);
+  height: calc(100% + 8px);
+  border-radius: 50%;
+  background: #3b82f6;
+  animation: gps-pulse 2s ease-out infinite;
+  pointer-events: none;
+}
+
 * {
   scrollbar-width: thin;
   scrollbar-color: #374151 transparent;

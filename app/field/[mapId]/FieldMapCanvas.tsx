@@ -59,7 +59,7 @@ const FEATURE_COLORS: Record<string, string> = {
 };
 
 const POSITION_ICON = L.divIcon({
-  className: '',
+  className: 'gps-position-marker',
   iconSize: [28, 28],
   iconAnchor: [14, 14],
   html: `<div style="
