@@ -96,7 +96,7 @@ export default function FieldView({ map, pages, features }: Props) {
   const [position, setPosition] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
   const [gpsError, setGpsError] = useState<string>('');
   const [gpsStarting, setGpsStarting] = useState<boolean>(true);
-  const [radiusM, setRadiusM] = useState<number>(50);
+  const [radiusM, setRadiusM] = useState<number>(10);
   const [pageImageUrls, setPageImageUrls] = useState<Record<number, string>>({});
   const watchIdRef = useRef<number | null>(null);
 
@@ -314,8 +314,8 @@ export default function FieldView({ map, pages, features }: Props) {
                 : 'Waiting for GPS…'}
             </p>
           </div>
-          <div className="flex items-center gap-1.5">
-            {[20, 50, 100, 250].map((r) => (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {[1, 5, 10, 25, 50, 100].map((r) => (
               <button
                 key={r}
                 onClick={() => setRadiusM(r)}
