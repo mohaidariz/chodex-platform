@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { LayoutDashboard, Settings, ShieldCheck, Map as MapIcon } from 'lucide-react';
 import { SignOutButton } from './components/SignOutButton';
+import { MobileTopBar } from './components/MobileTopBar';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -30,7 +31,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="flex h-screen bg-black text-white overflow-hidden">
-      <aside className="w-64 flex flex-col bg-black border-r border-gray-800 shrink-0">
+      {/* Mobile top bar + drawer (only renders on small screens) */}
+      <MobileTopBar
+        orgName={orgName}
+        userEmail={user.email ?? ''}
+        isSuperAdmin={isSuperAdmin}
+      />
+
+      {/* Desktop sidebar — hidden on mobile */}
+      <aside className="hidden md:flex w-64 flex-col bg-black border-r border-gray-800 shrink-0">
         <div className="px-6 py-5 border-b border-gray-800">
           <h1 className="text-xl font-bold text-white">Norrplex</h1>
           <p className="text-xs text-gray-400 mt-0.5 truncate">{orgName}</p>
@@ -73,7 +82,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto">{children}</main>
+      <main className="flex-1 overflow-auto flex flex-col">
+        {/* Reserve space on mobile for the top bar */}
+        <div className="md:hidden h-12 shrink-0" />
+        <div className="flex-1 overflow-auto">{children}</div>
+      </main>
     </div>
   );
 }
